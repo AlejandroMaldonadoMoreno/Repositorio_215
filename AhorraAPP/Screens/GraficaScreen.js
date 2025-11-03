@@ -148,32 +148,89 @@ function Detalle({ onVolver }) {
 }
 
 // Estilos en el mismo archivo (más sencillo de revisar en clase)
+// Organización: paleta + medidas base, luego grupos (header, tarjetas, gráfico, lista)
+const palette = {
+	bg: '#f6f7fb',
+	header: '#072A63',
+	primary: '#0A63D8',
+	card: '#ffffff',
+	text: '#333',
+	textMuted: '#666',
+	border: '#eee',
+	// categorías
+	catOtros: '#8b8bff',
+	catComida: '#36d36c',
+	catOcio: '#ffd15c',
+	catAgua: '#3aa0ff',
+};
+
+const metrics = {
+	r: 12,
+	rHeader: 18,
+	p: 16,
+	pSm: 12,
+	headerMinH: 56,
+	circle: 40,
+	dot: 12,
+	barW: 18,
+	chartH: 140,
+};
+
 const styles = StyleSheet.create({
-	container: { backgroundColor: '#f6f7fb', flex: 1 },
-		headerWrap: { backgroundColor: '#072A63', borderBottomLeftRadius: 18, borderBottomRightRadius: 18, paddingBottom: 8 },
-		headerRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 12, minHeight: 56 },
-		headerBack: { color: '#0A63D8', fontWeight: '600' },
-		headerTitle: { color: '#fff', fontSize: 16, fontWeight: '700', textAlign: 'center' },
-		cardBalance: { backgroundColor: '#fff', borderRadius: 12, padding: 16, elevation: 3, shadowColor: '#000', shadowOpacity: 0.08 },
-	small: { color: '#666', fontSize: 14 },
+	// Layout general
+	container: { flex: 1, backgroundColor: palette.bg },
+
+	// Header
+	headerWrap: {
+		backgroundColor: palette.header,
+		borderBottomLeftRadius: metrics.rHeader,
+		borderBottomRightRadius: metrics.rHeader,
+		paddingBottom: 8,
+	},
+	headerRow: {
+		flexDirection: 'row',
+		alignItems: 'center',
+		justifyContent: 'space-between',
+		paddingHorizontal: 12,
+		minHeight: metrics.headerMinH,
+	},
+	headerBack: { color: palette.primary, fontWeight: '600' },
+	headerTitle: { color: '#fff', fontSize: 16, fontWeight: '700', textAlign: 'center' },
+
+	// Tarjeta de saldo
+	cardBalance: {
+		backgroundColor: palette.card,
+		borderRadius: metrics.r,
+		padding: metrics.p,
+		elevation: 3,
+		shadowColor: '#000',
+		shadowOpacity: 0.08,
+	},
+	small: { color: palette.textMuted, fontSize: 14 },
 	balance: { fontSize: 28, fontWeight: '700', marginTop: 6 },
 	rowBetween: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 12 },
-	ctaButton: { backgroundColor: '#0A63D8', paddingVertical: 8, paddingHorizontal: 18, borderRadius: 20 },
+	ctaButton: { backgroundColor: palette.primary, paddingVertical: 8, paddingHorizontal: 18, borderRadius: 20 },
 	ctaText: { color: '#fff', fontWeight: '600' },
-	circleIcon: { width: 40, height: 40, borderRadius: 20, borderWidth: 2, borderColor: '#0A63D8' },
-	sectionCard: { backgroundColor: '#fff', marginTop: 18, borderRadius: 12, padding: 12, elevation: 1 },
+	circleIcon: { width: metrics.circle, height: metrics.circle, borderRadius: metrics.circle / 2, borderWidth: 2, borderColor: palette.primary },
+
+	// Secciones contenedoras
+	sectionCard: { backgroundColor: palette.card, marginTop: 18, borderRadius: metrics.r, padding: metrics.pSm, elevation: 1 },
 	sectionHeaderRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 },
 	sectionTitle: { fontSize: 16, fontWeight: '700' },
-	link: { color: '#0A63D8', fontWeight: '600' },
+	link: { color: palette.primary, fontWeight: '600' },
+
+	// Leyenda + gráfico
 	legendAndChart: { flexDirection: 'row', gap: 12 },
 	legend: { flex: 1, justifyContent: 'center' },
 	legendItem: { flexDirection: 'row', alignItems: 'center', marginBottom: 8 },
-	dot: { width: 12, height: 12, borderRadius: 6, marginRight: 8 },
-	legendText: { fontSize: 14, color: '#333' },
-	chartCard: { flex: 1.6, backgroundColor: '#fff', borderRadius: 8, padding: 12, borderWidth: 1, borderColor: '#eee' },
-	barsRow: { flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'space-around', height: 140 },
-	bar: { width: 18, borderRadius: 6 },
+	dot: { width: metrics.dot, height: metrics.dot, borderRadius: metrics.dot / 2, marginRight: 8 },
+	legendText: { fontSize: 14, color: palette.text },
+	chartCard: { flex: 1.6, backgroundColor: palette.card, borderRadius: 8, padding: metrics.pSm, borderWidth: 1, borderColor: palette.border },
+	barsRow: { flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'space-around', height: metrics.chartH },
+	bar: { width: metrics.barW, borderRadius: 6 },
 	chartNote: { fontSize: 12, color: '#888', marginTop: 8, textAlign: 'center' },
+
+	// Lista de movimientos
 	movementItem: { flexDirection: 'row', alignItems: 'center', paddingVertical: 12, borderTopWidth: 1, borderTopColor: '#f0f0f0' },
 	movLeft: { width: 40, alignItems: 'center' },
 	circleSmall: { width: 28, height: 28, borderRadius: 14, borderWidth: 1, borderColor: '#ddd' },
@@ -181,11 +238,13 @@ const styles = StyleSheet.create({
 	movTitle: { fontWeight: '600' },
 	movDate: { color: '#999', fontSize: 12 },
 	movAmount: { fontWeight: '700' },
-	// colores de categorías
-	catOtros: { backgroundColor: '#8b8bff' },
-	catComida: { backgroundColor: '#36d36c' },
-	catOcio: { backgroundColor: '#ffd15c' },
-	catAgua: { backgroundColor: '#3aa0ff' },
-	// detalle
-	piePlaceholder: { width: 160, height: 160, borderRadius: 80, backgroundColor: '#36d36c', alignItems: 'center', justifyContent: 'center' },
+
+	// Colores de categorías (aplicados como helpers)
+	catOtros: { backgroundColor: palette.catOtros },
+	catComida: { backgroundColor: palette.catComida },
+	catOcio: { backgroundColor: palette.catOcio },
+	catAgua: { backgroundColor: palette.catAgua },
+
+	// Placeholder de gráfico circular
+	piePlaceholder: { width: 160, height: 160, borderRadius: 80, backgroundColor: palette.catComida, alignItems: 'center', justifyContent: 'center' },
 });
