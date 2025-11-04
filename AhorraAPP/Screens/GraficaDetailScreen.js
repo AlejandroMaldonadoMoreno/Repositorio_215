@@ -1,11 +1,9 @@
 import React from 'react';
-import { View, Text, ScrollView, TouchableOpacity } from 'react-native';
-import { estilosDetalle as styles } from './styles/graficaDetalleStyles';
+import { View, Text, ScrollView, TouchableOpacity, StyleSheet } from 'react-native';
 
 export default function GraficaDetailScreen({ navigation }) {
   return (
-  // Pantalla de detalle con estilos separados
-  <ScrollView style={styles.container} contentContainerStyle={{ padding: 16 }}>
+    <ScrollView style={styles.container} contentContainerStyle={{ padding: 16 }}>
       <View style={styles.headerWrap} />
 
       <View style={styles.cardBalance}>
@@ -38,4 +36,19 @@ export default function GraficaDetailScreen({ navigation }) {
   );
 }
 
-// estilos importados desde ./styles/graficaDetalleStyles
+const styles = StyleSheet.create({
+  container: { backgroundColor: '#f6f7fb', flex: 1 },
+  headerWrap: { backgroundColor: '#072A63', height: 80, borderBottomLeftRadius: 18, borderBottomRightRadius: 18 },
+  cardBalance: { backgroundColor: '#fff', marginTop: -40, borderRadius: 12, padding: 16, elevation: 3 },
+  small: { color: '#666', fontSize: 14 },
+  balance: { fontSize: 28, fontWeight: '700', marginTop: 6 },
+  sectionCard: { backgroundColor: '#fff', marginTop: 18, borderRadius: 12, padding: 12 },
+  sectionHeaderRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  sectionTitle: { fontSize: 16, fontWeight: '700' },
+  link: { color: '#0A63D8', fontWeight: '600' },
+  pairRow: { flexDirection: 'row', alignItems: 'center', marginTop: 12 },
+  piePlaceholder: { width: 160, height: 160, borderRadius: 80, backgroundColor: '#36d36c', alignItems: 'center', justifyContent: 'center' },
+  legendBlock: { flex: 1, paddingLeft: 16 },
+  legendItem: { flexDirection: 'row', alignItems: 'center', marginBottom: 12 },
+  dot: { width: 12, height: 12, borderRadius: 6, marginRight: 8 },
+});
