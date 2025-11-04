@@ -11,12 +11,13 @@ export default function LoginScreen() {
         showsVerticalScrollIndicator={false}
         showsHorizontalScrollIndicator={false}
     >
+        <View style={styles.fondoAzul} />
         
         
         <View style={styles.dataContainer}>
             <Text style={styles.titleTag}> Saldo Disponible</Text>
 
-            <Text style={styles.titleMoney}>$25,000.75</Text>
+            <Text style={styles.titleMoney}>$ 25,000.75</Text>
             <Pressable style={styles.boton}>
                 <Text style={styles.tituloBoton}> Crear Transacción </Text>
             </Pressable>
@@ -48,7 +49,7 @@ export default function LoginScreen() {
                         <Text style={styles.tag}> Pagaste - concepto: </Text>
                     </View>
                     <View style={styles.tipoMovimientoContainer}>
-                        <Text style={styles.money}>$25,000.75</Text>
+                        <Text style={styles.money}>$ 25,000.75</Text>
                         <Pressable style={styles.deleteBoton}>
                             <Text style={styles.deleteText}>X</Text>
                         </Pressable>
@@ -61,7 +62,7 @@ export default function LoginScreen() {
                         <Text style={styles.tag}> Recibiste - concepto: </Text>
                     </View>
                     <View style={styles.tipoMovimientoContainer}>
-                        <Text style={styles.money}>$45,000.13</Text>
+                        <Text style={styles.money}>$ 45,000.13</Text>
                         <Pressable style={styles.deleteBoton}>
                             <Text style={styles.deleteText}>X</Text>
                         </Pressable>
@@ -74,7 +75,7 @@ export default function LoginScreen() {
                         <Text style={styles.tag}> Recibiste - concepto: </Text>
                     </View>
                     <View style={styles.tipoMovimientoContainer}>
-                        <Text style={styles.money}>$5,450.00</Text>
+                        <Text style={styles.money}>$ 5,450.00</Text>
                         <Pressable style={styles.deleteBoton}>
                             <Text style={styles.deleteText}>X</Text>
                         </Pressable>
@@ -87,7 +88,7 @@ export default function LoginScreen() {
                         <Text style={styles.tag}> Pagaste - concepto: </Text>
                     </View>
                     <View style={styles.tipoMovimientoContainer}>
-                        <Text style={styles.money}>$1,000.13</Text>
+                        <Text style={styles.money}>$ 1,000.13</Text>
                         <Pressable style={styles.deleteBoton}>
                             <Text style={styles.deleteText}>X</Text>
                         </Pressable>
@@ -107,21 +108,21 @@ export default function LoginScreen() {
                 <View style={styles.presupuestoObjectContainer1}>
                 
                     <Text style={styles.movimientoTag}> Otros</Text>
-                    <Text style={styles.money}>$2,000.00</Text>
+                    <Text style={styles.money}>$ 2,000.00</Text>
                 
                 </View>
 
                 <View style={styles.presupuestoObjectContainer2}>
                 
                     <Text style={styles.movimientoTag}> Comida</Text>
-                    <Text style={styles.money}>$1,000.40</Text>
+                    <Text style={styles.money}>$ 1,000.40</Text>
                 
                 </View>
 
                 <View style={styles.presupuestoObjectContainer3}>
                 
                     <Text style={styles.movimientoTag}> Ocio</Text>
-                    <Text style={styles.money}>$1,500.10</Text>
+                    <Text style={styles.money}>$ 1,500.10</Text>
                 
                 </View>
 
@@ -131,33 +132,28 @@ export default function LoginScreen() {
                 <View style={styles.presupuestoObjectContainer4}>
                 
                     <Text style={styles.movimientoTag}> Agua</Text>
-                    <Text style={styles.money}>$1,500.00</Text>
+                    <Text style={styles.money}>$ 1,500.00</Text>
                 
                 </View>
 
                 <View style={styles.presupuestoObjectContainer5}>
                 
                     <Text style={styles.movimientoTag}> Luz</Text>
-                    <Text style={styles.money}>$2060.40</Text>
+                    <Text style={styles.money}>$ 2060.40</Text>
                 
                 </View>
 
                 <View style={styles.presupuestoObjectContainer6}>
                 
                     <Text style={styles.movimientoTag}> Internet</Text>
-                    <Text style={styles.money}>$1,500.10</Text>
+                    <Text style={styles.money}>$ 1,500.10</Text>
                 
                 </View>
 
             </View>
             
         </View>
-
-        
-
-        
-
-        
+        <View style={styles.fondoInferior} />
         
     </ScrollView>
         
@@ -167,13 +163,30 @@ export default function LoginScreen() {
 
 const styles = StyleSheet.create({
     containerMain: {
-        backgroundColor: '#002359',
+        backgroundColor: '#f2f4f8',
         padding: 40, 
     },
-    container: {
-        flex: 1,
-        backgroundColor: '#002359',  
+    fondoAzul: {
+        position: "absolute",
+        top: 0,
+        left: 0,
+        width: "100%",
+        height: 250,
+        backgroundColor: "#0b3d91",
+        borderBottomLeftRadius: 40,
+        borderBottomRightRadius: 40,
     },
+    fondoInferior: {
+        position: "absolute",
+        bottom: 0,
+        left: 0,
+        width: "100%",
+        height: 60,
+        backgroundColor: "#0b3d91",
+        borderTopLeftRadius: 40,
+        borderTopRightRadius: 40,
+    },
+    
     dataContainer: {
         flex: 1,
         padding: 10,
@@ -186,7 +199,7 @@ const styles = StyleSheet.create({
         marginBottom: 40,
         borderColor: '#919191ff',
         borderWidth: 2,
-        
+        elevation: 5,
 
     },
     movimientosContainer: {
@@ -356,7 +369,7 @@ const styles = StyleSheet.create({
     },
     titleMoney: {
         fontSize: 50,
-        fontWeight: '500',
+        fontWeight: '700',
         alignItems: 'center',
         marginBottom: 20,
         marginTop: 20,
