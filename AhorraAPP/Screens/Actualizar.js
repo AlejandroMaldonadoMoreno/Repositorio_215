@@ -54,7 +54,7 @@ const styles = StyleSheet.create({
     justifyContent: "flex-start",
   },
   franjaAzul: {
-    backgroundColor: "#0b3d91",
+    backgroundColor: "#002359",
     height: 230, 
     width: "100%",
     position: "absolute",
@@ -100,7 +100,7 @@ const styles = StyleSheet.create({
     fontSize: 15,
   },
   boton: {
-    backgroundColor: "#0066ff",
+    backgroundColor: "#0a57d9",
     paddingVertical: 15,
     borderRadius: 8,
     marginTop: 20,

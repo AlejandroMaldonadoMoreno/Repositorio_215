@@ -151,7 +151,7 @@ function Detalle({ onVolver }) {
 // Organización: paleta + medidas base, luego grupos (header, tarjetas, gráfico, lista)
 const palette = {
 	bg: '#f6f7fb',
-	header: '#072A63',
+	header: '#002359',
 	primary: '#0A63D8',
 	card: '#ffffff',
 	text: '#333',

@@ -18,8 +18,6 @@ export default function MenuScreen() {
       return <Actualizar />;
     case 'grafica':
       return <GraficaScreen />;
-    case 'home':
-      return <HomeScreen />;
     case 'login':
       return <LoginScreen />;
     case 'transacciones':
@@ -36,16 +34,16 @@ export default function MenuScreen() {
           </View>
 
           <View style={styles.buttonContainer}>
-            <Button title="Gráfica (Principal)" onPress={() => setScreen('grafica')} />
+            <Button title="Gráfica (Principal y Detalle)" onPress={() => setScreen('grafica')} />
           </View>
 
           {/* <View style={styles.buttonContainer}>
             <Button title="Detalle de Gráfica" onPress={() => setScreen('graficaDetail')} />
           </View> */}
 
-          <View style={styles.buttonContainer}>
+          {/* <View style={styles.buttonContainer}>
             <Button title="Inicio (Home)" onPress={() => setScreen('home')} />
-          </View>
+          </View> */}
 
           <View style={styles.buttonContainer}>
             <Button title="Inicio de Sesión (Login)" onPress={() => setScreen('login')} />
