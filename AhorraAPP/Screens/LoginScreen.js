@@ -324,13 +324,14 @@ const styles = StyleSheet.create({
     },
 
     BotonInicio: {
+        
         height: 55,
         borderRadius: 12,
         alignItems: 'center',
         justifyContent: 'center',
         backgroundColor: '#0a57d9',
         marginTop: 10,
-        marginBottom: 8,
+        marginBottom: 50,
     },
     BotonInicioText: {
         color: '#fff',

@@ -13,11 +13,15 @@ export default function ProfileScreen() {
   return (
     <SafeAreaView style={styles.contenedor}>
       <ScrollView contentContainerStyle={styles.contenidoScroll}>
-        <View style={styles.barraSuperior}>
-          <Text style={styles.botonVolver}>{"< Back"}</Text>
-          <Text style={styles.tituloApp}>Ahorra+ App</Text>
+        {/* Header grande (recuadro azul) */}
+        <View style={styles.recuadroAzul}>
+          <View style={styles.barraSuperior}>
+            <Text style={styles.botonVolver}>{"< Back"}</Text>
+          </View>
+          <Text style={styles.recuadroAzulText}>Ahorra+ App</Text>
         </View>
 
+        {/* Tarjeta de perfil se solapa con el header para efecto visual */}
         <View style={styles.tarjetaPerfil}>
           <View style={styles.avatar}>
             <Text style={styles.avatarInicial}>{nombre ? nombre.charAt(0).toUpperCase() : "U"}</Text>
@@ -81,7 +85,7 @@ export default function ProfileScreen() {
             <Switch
               value={alertas}
               onValueChange={setAlertas}
-              trackColor={{ false: '#d1d5db', true: '#0a57d9' }}
+              trackColor={{ false: '#d1d5db', true: "#002359", }}
               thumbColor={alertas ? '#ffffff' : '#f4f3f4'}
             />
           </View>
@@ -104,25 +108,15 @@ export default function ProfileScreen() {
 const styles = StyleSheet.create({
   contenedor: {
     flex: 1,
-    backgroundColor: "#E8F0FE",
+    backgroundColor: "#ffffffff",
   },
   contenidoScroll: {
     alignItems: "center",
     paddingBottom: 40,
   },
-  barraSuperior: {
-    width: "100%",
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    paddingHorizontal: 15,
-    paddingVertical: 12,
-    backgroundColor: "#fff",
-    borderBottomWidth: 1,
-    borderBottomColor: "#dce6f7",
-  },
+  
   botonVolver: {
-    color: "#007AFF",
+    color: "#002359",
     fontSize: 16,
   },
   tituloApp: {
@@ -133,10 +127,40 @@ const styles = StyleSheet.create({
     color: "#0A3D91",
     marginRight: 30,
   },
+  recuadroAzul: {
+    width: "100%",
+    height: 160,
+    backgroundColor: "#072A63",
+    borderBottomLeftRadius: 20,
+    borderBottomRightRadius: 20,
+    paddingTop: 18,
+    paddingHorizontal: 16,
+    alignItems: "center",
+    justifyContent: "flex-start",
+    shadowColor: "#000",
+    shadowOpacity: 0.08,
+    shadowOffset: { width: 0, height: 4 },
+    shadowRadius: 6,
+    elevation: 3,
+  },
+  recuadroAzulText: {
+    color: "#ffffff",
+    fontSize: 22,
+    fontWeight: "800",
+    marginTop: 12,
+  },
+  barraSuperior: {
+    width: "100%",
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "flex-start",
+    backgroundColor: "transparent",
+    paddingHorizontal: 2,
+  },
   tarjetaPerfil: {
     width: "90%",
     backgroundColor: "#fff",
-    marginTop: 25,
+    marginTop: -40,
     borderRadius: 20,
     paddingVertical: 25,
     alignItems: "center",
@@ -157,13 +181,13 @@ const styles = StyleSheet.create({
   },
   avatarInicial: {
     fontSize: 36,
-    color: "#2A6FDB",
+    color: "#002359",
     fontWeight: "bold",
   },
   nombrePerfil: {
     fontSize: 18,
     fontWeight: "bold",
-    color: "#0A3D91",
+    color: "#000000ff",
     textAlign: "center",
   },
   correoPerfil: {
@@ -190,7 +214,7 @@ const styles = StyleSheet.create({
     marginBottom: 15,
   },
   etiqueta: {
-    color: "#003366",
+    color: "#000000ff",
     fontWeight: "600",
     fontSize: 14,
     marginBottom: 5,
@@ -204,7 +228,7 @@ const styles = StyleSheet.create({
     marginBottom: 15,
   },
   boton: {
-    backgroundColor: "#2A6FDB",
+    backgroundColor: "#002359",
     borderRadius: 12,
     paddingVertical: 12,
     alignItems: "center",
@@ -225,7 +249,7 @@ const styles = StyleSheet.create({
   },
   textoPie: {
     fontSize: 12,
-    color: "#0A3D91",
+    color: "#000000ff",
   },
   switchContainer: {
     flexDirection: 'row',

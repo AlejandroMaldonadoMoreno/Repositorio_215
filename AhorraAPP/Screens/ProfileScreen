@@ -1,227 +1,227 @@
-import React, { useState } from "react";
-import {
-  View,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  StyleSheet,
-  ScrollView,
-  SafeAreaView,
-} from "react-native";
+// import React, { useState } from "react";
+// import {
+//   View,
+//   Text,
+//   TextInput,
+//   TouchableOpacity,
+//   StyleSheet,
+//   ScrollView,
+//   SafeAreaView,
+// } from "react-native";
 
-export default function ProfileScreen() {
-  const [nombre, setNombre] = useState("");
-  const [celular, setCelular] = useState("");
-  const [correo, setCorreo] = useState("");
-  const [password, setPassword] = useState("");
+// export default function ProfileScreen() {
+//   const [nombre, setNombre] = useState("");
+//   const [celular, setCelular] = useState("");
+//   const [correo, setCorreo] = useState("");
+//   const [password, setPassword] = useState("");
 
-  return (
-    <SafeAreaView style={styles.root}>
-      <ScrollView contentContainerStyle={styles.scrollContent}>
-        {/* Encabezado tipo barra superior */}
-        <View style={styles.header}>
-          <Text style={styles.headerBack}>{"< Back"}</Text>
-          <Text style={styles.headerTitle}>Ahorra+ App</Text>
-        </View>
+//   return (
+//     <SafeAreaView style={styles.root}>
+//       <ScrollView contentContainerStyle={styles.scrollContent}>
+//         {/* Encabezado tipo barra superior */}
+//         <View style={styles.header}>
+//           <Text style={styles.headerBack}>{"< Back"}</Text>
+//           <Text style={styles.headerTitle}>Ahorra+ App</Text>
+//         </View>
 
-        {/* Tarjeta superior con información */}
-        <View style={styles.profileCard}>
-          <View style={styles.avatarCircle}>
-            <Text style={styles.avatarInitial}>{nombre ? nombre.charAt(0).toUpperCase() : "U"}</Text>
-          </View>
-          <View>
-            <Text style={styles.profileName}>
-              {nombre || "Nombre del usuario"}
-            </Text>
-            <Text style={styles.profileEmail}>
-              {correo || "correo@ejemplo.com"}
-            </Text>
-          </View>
-        </View>
+//         {/* Tarjeta superior con información */}
+//         <View style={styles.profileCard}>
+//           <View style={styles.avatarCircle}>
+//             <Text style={styles.avatarInitial}>{nombre ? nombre.charAt(0).toUpperCase() : "U"}</Text>
+//           </View>
+//           <View>
+//             <Text style={styles.profileName}>
+//               {nombre || "Nombre del usuario"}
+//             </Text>
+//             <Text style={styles.profileEmail}>
+//               {correo || "correo@ejemplo.com"}
+//             </Text>
+//           </View>
+//         </View>
 
-        {/* Formulario */}
-        <View style={styles.formCard}>
-          <Text style={styles.formTitle}>Actualiza tu información</Text>
+//         {/* Formulario */}
+//         <View style={styles.formCard}>
+//           <Text style={styles.formTitle}>Actualiza tu información</Text>
 
-          <Text style={styles.label}>Nombre del usuario</Text>
-          <TextInput
-            style={styles.input}
-            placeholder="Ingresa tu nombre"
-            placeholderTextColor="#999"
-            value={nombre}
-            onChangeText={setNombre}
-          />
+//           <Text style={styles.label}>Nombre del usuario</Text>
+//           <TextInput
+//             style={styles.input}
+//             placeholder="Ingresa tu nombre"
+//             placeholderTextColor="#999"
+//             value={nombre}
+//             onChangeText={setNombre}
+//           />
 
-          <Text style={styles.label}>Número Celular</Text>
-          <TextInput
-            style={styles.input}
-            placeholder="Ingresa tu número"
-            placeholderTextColor="#999"
-            keyboardType="phone-pad"
-            value={celular}
-            onChangeText={setCelular}
-          />
+//           <Text style={styles.label}>Número Celular</Text>
+//           <TextInput
+//             style={styles.input}
+//             placeholder="Ingresa tu número"
+//             placeholderTextColor="#999"
+//             keyboardType="phone-pad"
+//             value={celular}
+//             onChangeText={setCelular}
+//           />
 
-          <Text style={styles.label}>Correo electrónico</Text>
-          <TextInput
-            style={styles.input}
-            placeholder="correo@ejemplo.com"
-            placeholderTextColor="#999"
-            keyboardType="email-address"
-            value={correo}
-            onChangeText={setCorreo}
-          />
+//           <Text style={styles.label}>Correo electrónico</Text>
+//           <TextInput
+//             style={styles.input}
+//             placeholder="correo@ejemplo.com"
+//             placeholderTextColor="#999"
+//             keyboardType="email-address"
+//             value={correo}
+//             onChangeText={setCorreo}
+//           />
 
-          <Text style={styles.label}>Nueva contraseña</Text>
-          <TextInput
-            style={styles.input}
-            placeholder="••••••••"
-            placeholderTextColor="#999"
-            secureTextEntry
-            value={password}
-            onChangeText={setPassword}
-          />
+//           <Text style={styles.label}>Nueva contraseña</Text>
+//           <TextInput
+//             style={styles.input}
+//             placeholder="••••••••"
+//             placeholderTextColor="#999"
+//             secureTextEntry
+//             value={password}
+//             onChangeText={setPassword}
+//           />
 
-          <TouchableOpacity style={styles.button}>
-            <Text style={styles.buttonText}>Actualizar</Text>
-          </TouchableOpacity>
-        </View>
+//           <TouchableOpacity style={styles.button}>
+//             <Text style={styles.buttonText}>Actualizar</Text>
+//           </TouchableOpacity>
+//         </View>
 
-        {/* Pie inferior decorativo */}
-        <View style={styles.footer}>
-          <Text style={styles.footerText}>
-            Ahorra+ • Seguridad en tus finanzas
-          </Text>
-        </View>
-      </ScrollView>
-    </SafeAreaView>
-  );
-}
+//         {/* Pie inferior decorativo */}
+//         <View style={styles.footer}>
+//           <Text style={styles.footerText}>
+//             Ahorra+ • Seguridad en tus finanzas
+//           </Text>
+//         </View>
+//       </ScrollView>
+//     </SafeAreaView>
+//   );
+// }
 
-const styles = StyleSheet.create({
-  root: {
-    flex: 1,
-    backgroundColor: "#E8F0FE",
-  },
-  scrollContent: {
-    alignItems: "center",
-    paddingBottom: 40,
-  },
-  header: {
-    width: "100%",
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    paddingHorizontal: 15,
-    paddingVertical: 12,
-    backgroundColor: "#fff",
-    borderBottomWidth: 1,
-    borderBottomColor: "#dce6f7",
-  },
-  headerBack: {
-    color: "#007AFF",
-    fontSize: 16,
-  },
-  headerTitle: {
-    flex: 1,
-    textAlign: "center",
-    fontWeight: "bold",
-    fontSize: 17,
-    color: "#0A3D91",
-    marginRight: 30, // para compensar el "< Back"
-  },
-  profileCard: {
-    width: "90%",
-    backgroundColor: "#fff",
-    marginTop: 25,
-    borderRadius: 20,
-    paddingVertical: 25,
-    alignItems: "center",
-    shadowColor: "#000",
-    shadowOpacity: 0.1,
-    shadowOffset: { width: 0, height: 4 },
-    shadowRadius: 6,
-    elevation: 4,
-  },
-  avatarCircle: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
-    backgroundColor: "#E0EBFF",
-    justifyContent: "center",
-    alignItems: "center",
-    marginBottom: 10,
-  },
-  avatarInitial: {
-    fontSize: 36,
-    color: "#2A6FDB",
-    fontWeight: "bold",
-  },
-  profileName: {
-    fontSize: 18,
-    fontWeight: "bold",
-    color: "#0A3D91",
-    textAlign: "center",
-  },
-  profileEmail: {
-    color: "#777",
-    fontSize: 14,
-    textAlign: "center",
-    marginTop: 2,
-  },
-  formCard: {
-    width: "90%",
-    backgroundColor: "#fff",
-    borderRadius: 20,
-    padding: 20,
-    marginTop: 20,
-    shadowColor: "#000",
-    shadowOpacity: 0.05,
-    shadowRadius: 5,
-    elevation: 2,
-  },
-  formTitle: {
-    fontSize: 16,
-    fontWeight: "bold",
-    color: "#003366",
-    marginBottom: 15,
-  },
-  label: {
-    color: "#003366",
-    fontWeight: "600",
-    fontSize: 14,
-    marginBottom: 5,
-  },
-  input: {
-    backgroundColor: "#F5F9FF",
-    borderRadius: 12,
-    padding: 10,
-    borderWidth: 1,
-    borderColor: "#D0E0F0",
-    marginBottom: 15,
-  },
-  button: {
-    backgroundColor: "#2A6FDB",
-    borderRadius: 12,
-    paddingVertical: 12,
-    alignItems: "center",
-    marginTop: 5,
-  },
-  buttonText: {
-    color: "#fff",
-    fontWeight: "bold",
-    fontSize: 16,
-  },
-  footer: {
-    marginTop: 30,
-    backgroundColor: "#D6E3FF",
-    width: "80%",
-    padding: 10,
-    borderRadius: 12,
-    alignItems: "center",
-  },
-  footerText: {
-    fontSize: 12,
-    color: "#0A3D91",
-  },
-});
+// const styles = StyleSheet.create({
+//   root: {
+//     flex: 1,
+//     backgroundColor: "#E8F0FE",
+//   },
+//   scrollContent: {
+//     alignItems: "center",
+//     paddingBottom: 40,
+//   },
+//   header: {
+//     width: "100%",
+//     flexDirection: "row",
+//     alignItems: "center",
+//     justifyContent: "space-between",
+//     paddingHorizontal: 15,
+//     paddingVertical: 12,
+//     backgroundColor: "#fff",
+//     borderBottomWidth: 1,
+//     borderBottomColor: "#dce6f7",
+//   },
+//   headerBack: {
+//     color: "#007AFF",
+//     fontSize: 16,
+//   },
+//   headerTitle: {
+//     flex: 1,
+//     textAlign: "center",
+//     fontWeight: "bold",
+//     fontSize: 17,
+//     color: "#0A3D91",
+//     marginRight: 30, // para compensar el "< Back"
+//   },
+//   profileCard: {
+//     width: "90%",
+//     backgroundColor: "#fff",
+//     marginTop: 25,
+//     borderRadius: 20,
+//     paddingVertical: 25,
+//     alignItems: "center",
+//     shadowColor: "#000",
+//     shadowOpacity: 0.1,
+//     shadowOffset: { width: 0, height: 4 },
+//     shadowRadius: 6,
+//     elevation: 4,
+//   },
+//   avatarCircle: {
+//     width: 80,
+//     height: 80,
+//     borderRadius: 40,
+//     backgroundColor: "#E0EBFF",
+//     justifyContent: "center",
+//     alignItems: "center",
+//     marginBottom: 10,
+//   },
+//   avatarInitial: {
+//     fontSize: 36,
+//     color: "#2A6FDB",
+//     fontWeight: "bold",
+//   },
+//   profileName: {
+//     fontSize: 18,
+//     fontWeight: "bold",
+//     color: "#0A3D91",
+//     textAlign: "center",
+//   },
+//   profileEmail: {
+//     color: "#777",
+//     fontSize: 14,
+//     textAlign: "center",
+//     marginTop: 2,
+//   },
+//   formCard: {
+//     width: "90%",
+//     backgroundColor: "#fff",
+//     borderRadius: 20,
+//     padding: 20,
+//     marginTop: 20,
+//     shadowColor: "#000",
+//     shadowOpacity: 0.05,
+//     shadowRadius: 5,
+//     elevation: 2,
+//   },
+//   formTitle: {
+//     fontSize: 16,
+//     fontWeight: "bold",
+//     color: "#003366",
+//     marginBottom: 15,
+//   },
+//   label: {
+//     color: "#003366",
+//     fontWeight: "600",
+//     fontSize: 14,
+//     marginBottom: 5,
+//   },
+//   input: {
+//     backgroundColor: "#F5F9FF",
+//     borderRadius: 12,
+//     padding: 10,
+//     borderWidth: 1,
+//     borderColor: "#D0E0F0",
+//     marginBottom: 15,
+//   },
+//   button: {
+//     backgroundColor: "#2A6FDB",
+//     borderRadius: 12,
+//     paddingVertical: 12,
+//     alignItems: "center",
+//     marginTop: 5,
+//   },
+//   buttonText: {
+//     color: "#fff",
+//     fontWeight: "bold",
+//     fontSize: 16,
+//   },
+//   footer: {
+//     marginTop: 30,
+//     backgroundColor: "#D6E3FF",
+//     width: "80%",
+//     padding: 10,
+//     borderRadius: 12,
+//     alignItems: "center",
+//   },
+//   footerText: {
+//     fontSize: 12,
+//     color: "#0A3D91",
+//   },
+// });
