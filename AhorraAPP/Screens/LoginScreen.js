@@ -21,7 +21,9 @@ export default function LoginScreen() {
         }
 
         Alert.alert('Inicio de sesión exitoso', 'Bienvenido de nuevo!');
-        return true;
+        setCorreo(''); 
+        setContrasenia('');
+        return true;
     }
     const validacionRegistro=()=>{
         if(nombre.trim() === '' && apellidos.trim() === '' && telefono.trim() === '' && correo.trim() === '' && contrasenia.trim() === '' && alertas === false){
@@ -43,8 +45,30 @@ export default function LoginScreen() {
         }
 
         Alert.alert('Registro exitoso', '¡Bienvenido a la aplicación de ahorro!');
+        setNombre('');
+        setApellidos('');
+        setTelefono('');
+        setCorreo('');
+        setContrasenia('');
+        setAlertas(false);
         return true;
     }
+
+    const validacionRecuperar = () => {
+        if (correo.trim() === '') {
+            Alert.alert("Error los campos estan en blanco (Móvil)");
+            return false;
+        }
+        if (!correo.includes('@') || !correo.includes('.')) {
+            Alert.alert("El correo no es valido (Móvil)");
+            return false;
+        }
+
+        Alert.alert('Instrucciones enviadas', 'Revisa tu correo para recuperar tu contraseña');
+        setCorreo(''); // Limpiar el campo de correo
+        return true;
+    }
+
 
     return (
     <View style={styles.container}>
@@ -112,8 +136,18 @@ export default function LoginScreen() {
                         <Text style={styles.BotonRegistro}> Regístrate</Text>
                     </Pressable>
                 </View>
+
+                <View style={styles.card3}>
+                    <Text style={styles.CardText3}> ¿Perdiste tu contraseña? </Text>
+                </View>
+                <View style={styles.contenedorBotonContra}>
+                    <Pressable style={styles.botonContra} onPress={() => setModalVisible('Recuperar') }>
+                        <Text style={styles.TextContra}> Recuperala aquí</Text>
+                    </Pressable>
+                </View>
             </View>
         </Modal>
+
         <Modal
             visible={modalVisible === 'registro'}
             animationType="slide"
@@ -205,6 +239,54 @@ export default function LoginScreen() {
             </View>
 
         </Modal>
+
+
+        <Modal
+            visible={modalVisible === 'Recuperar'}
+            animationType="slide"
+            transparent={false}
+            onRequestClose={() => setModalVisible(null)}
+        >
+            <View style={styles.containerMain}>
+
+                <View style={styles.Encabezado2}>
+                    <View style={styles.Salir}>
+                        <Pressable onPress={() => setModalVisible(null)}>
+                            <Text style={styles.Atras}>‹ Atras</Text>
+                        </Pressable>
+
+                    </View>
+
+                    <Text style={styles.Titulo}>Recuperar Contraseña</Text>
+                </View>
+
+
+                <View style={styles.containContra}>
+                    <Text style={styles.label}>Correo electrónico:</Text>
+                    <TextInput
+                        style={styles.input}
+                        placeholder="Ingrese su correo electrónico"
+                        keyboardType="email-address"
+                        autoCapitalize="none"
+                        value={correo}
+                        onChangeText={setCorreo}
+                    />
+
+                    <Pressable style={styles.BotonInicio} onPress={() => {
+                        if (validacionRecuperar()) {
+                            setModalVisible(null);
+                        }
+                    }}>
+                        <Text style={styles.BotonInicioText}>Enviar</Text>
+                    </Pressable>
+                </View>
+            </View>
+
+
+        </Modal>
+
+
+
     </View>
   );
 }
@@ -324,7 +406,7 @@ const styles = StyleSheet.create({
     },
 
     BotonInicio: {
-        
+
         height: 55,
         borderRadius: 12,
         alignItems: 'center',
@@ -364,6 +446,51 @@ const styles = StyleSheet.create({
         color: '#4b5563',
         fontSize: 13,
         flexShrink: 1,
+    },
+    card3: {
+        flexDirection: 'row',
+        justifyContent: 'center',
+        alignItems: 'center',
+        marginTop: 20,
+        paddingHorizontal: 16,
+    },
+    botonContra: {
+      width: '70%',
+        height: 55,
+        borderRadius: 12,
+        alignItems: 'center',
+        justifyContent: 'center',
+        backgroundColor: '#0a57d9',
+        marginTop: 10,
+        marginBottom: 50,
+    },
+    CardText3: {
+        color: '#6b7280',
+        fontWeight: '700',
+        fontSize: 17,
+    },
+    TextContra: {
+        color: '#ffffff',
+        fontWeight: '700',
+        fontSize:20
+    },
+    contenedorBotonContra:{
+        flexDirection: 'row',
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    containContra: {
+        backgroundColor: '#fff',
+        width: '90%',
+        maxWidth: 500,
+        alignSelf: 'center',
+        minHeight: 200,
+        marginTop: -22,
+        padding: 16,
+        borderRadius: 16,
+        elevation: 5,
+        borderColor:'#171717',
+        borderWidth: 1,
     },
 
 });
