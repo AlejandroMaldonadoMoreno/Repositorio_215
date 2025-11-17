@@ -20,6 +20,7 @@ export default function MenuScreen() {
       return <GraficaDetailScreen />;
     case 'grafica':
       return <GraficaScreen />;
+    case 'home':
       return <HomeScreen />;
     case 'login':
       return <LoginScreen />;
