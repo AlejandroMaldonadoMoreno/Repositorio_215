@@ -1,19 +1,46 @@
-import React from "react";
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView } from "react-native";
+import React, { useState } from "react";
+import { View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView, Alert } from "react-native";
 
 export default function ActualizarTransaccion() {
+  // Estados de los campos
+  const [nombre, setNombre] = useState("");
+  const [cuenta, setCuenta] = useState("");
+  const [monto, setMonto] = useState("");
+  const [concepto, setConcepto] = useState("");
+  const [fecha, setFecha] = useState("");
+
+  // Función parcial (validación + simulación de guardado)
+  const actualizar = () => {
+    if (!nombre || !cuenta || !monto || !concepto || !fecha) {
+      Alert.alert("Campos incompletos", "Por favor completa todos los datos.");
+      return;
+    }
+
+    // FUNCIONALIDAD PARCIAL:
+    // Aquí luego puedes llamar a tu API con fetch() o axios()
+
+    Alert.alert(
+      "Transacción actualizada",
+      `Nombre: ${nombre}\nCuenta: ${cuenta}\nMonto: $${monto}`
+    );
+  };
+
   return (
     <ScrollView contentContainerStyle={styles.container}>
-      {/* Franja azul de fondo */}
       <View style={styles.franjaAzul} />
 
-      {/* Contenedor principal */}
       <View style={styles.contenido}>
         <Text style={styles.titulo}>Actualizar Transacción</Text>
 
         <View style={styles.formulario}>
           <Text style={styles.label}>Nombre/s:</Text>
-          <TextInput style={styles.input} placeholder="Ej. Juan Pérez" placeholderTextColor="#aaa" />
+          <TextInput
+            style={styles.input}
+            placeholder="Ej. Juan Pérez"
+            placeholderTextColor="#aaa"
+            value={nombre}
+            onChangeText={setNombre}
+          />
 
           <Text style={styles.label}>Número tarjeta o cuenta:</Text>
           <TextInput
@@ -21,6 +48,8 @@ export default function ActualizarTransaccion() {
             keyboardType="numeric"
             placeholder="Ej. 1234 5678 9012 3456"
             placeholderTextColor="#aaa"
+            value={cuenta}
+            onChangeText={setCuenta}
           />
 
           <Text style={styles.label}>Monto:</Text>
@@ -29,15 +58,29 @@ export default function ActualizarTransaccion() {
             keyboardType="numeric"
             placeholder="Ej. 1500.00"
             placeholderTextColor="#aaa"
+            value={monto}
+            onChangeText={setMonto}
           />
 
           <Text style={styles.label}>Concepto:</Text>
-          <TextInput style={styles.input} placeholder="Ej. Pago de renta" placeholderTextColor="#aaa" />
+          <TextInput
+            style={styles.input}
+            placeholder="Ej. Pago de renta"
+            placeholderTextColor="#aaa"
+            value={concepto}
+            onChangeText={setConcepto}
+          />
 
           <Text style={styles.label}>Fecha:</Text>
-          <TextInput style={styles.input} placeholder="DD/MM/AAAA" placeholderTextColor="#aaa" />
+          <TextInput
+            style={styles.input}
+            placeholder="DD/MM/AAAA"
+            placeholderTextColor="#aaa"
+            value={fecha}
+            onChangeText={setFecha}
+          />
 
-          <TouchableOpacity style={styles.boton}>
+          <TouchableOpacity style={styles.boton} onPress={actualizar}>
             <Text style={styles.textoBoton}>Actualizar</Text>
           </TouchableOpacity>
         </View>
@@ -55,7 +98,7 @@ const styles = StyleSheet.create({
   },
   franjaAzul: {
     backgroundColor: "#002359",
-    height: 230, 
+    height: 230,
     width: "100%",
     position: "absolute",
     top: 0,
@@ -65,7 +108,7 @@ const styles = StyleSheet.create({
   },
   contenido: {
     width: "90%",
-    marginTop: 100, 
+    marginTop: 100,
     alignItems: "center",
   },
   titulo: {
