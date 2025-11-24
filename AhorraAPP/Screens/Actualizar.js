@@ -1,27 +1,54 @@
 import React, { useState } from "react";
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView, Alert } from "react-native";
+import {
+  View,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  StyleSheet,
+  ScrollView,
+  Alert,
+  Platform,
+} from "react-native";
+import DateTimePicker from "@react-native-community/datetimepicker";
 
 export default function ActualizarTransaccion() {
-  // Estados de los campos
   const [nombre, setNombre] = useState("");
   const [cuenta, setCuenta] = useState("");
   const [monto, setMonto] = useState("");
   const [concepto, setConcepto] = useState("");
-  const [fecha, setFecha] = useState("");
+  const [fecha, setFecha] = useState(new Date());
+  const [showPicker, setShowPicker] = useState(false);
 
-  // Función parcial (validación + simulación de guardado)
+  const abrirCalendario = () => {
+    setShowPicker(true);
+  };
+
+  const onChangeFecha = (event, selectedDate) => {
+    setShowPicker(false);
+    if (selectedDate) {
+      setFecha(selectedDate);
+    }
+  };
+
+  const formatearFecha = (date) => {
+    return date.toLocaleDateString("es-MX", {
+      day: "2-digit",
+      month: "2-digit",
+      year: "numeric",
+    });
+  };
+
   const actualizar = () => {
-    if (!nombre || !cuenta || !monto || !concepto || !fecha) {
+    if (!nombre || !cuenta || !monto || !concepto) {
       Alert.alert("Campos incompletos", "Por favor completa todos los datos.");
       return;
     }
 
-    // FUNCIONALIDAD PARCIAL:
-    // Aquí luego puedes llamar a tu API con fetch() o axios()
-
     Alert.alert(
       "Transacción actualizada",
-      `Nombre: ${nombre}\nCuenta: ${cuenta}\nMonto: $${monto}`
+      `Nombre: ${nombre}\nCuenta: ${cuenta}\nMonto: $${monto}\nFecha: ${formatearFecha(
+        fecha
+      )}`
     );
   };
 
@@ -72,13 +99,21 @@ export default function ActualizarTransaccion() {
           />
 
           <Text style={styles.label}>Fecha:</Text>
-          <TextInput
-            style={styles.input}
-            placeholder="DD/MM/AAAA"
-            placeholderTextColor="#aaa"
-            value={fecha}
-            onChangeText={setFecha}
-          />
+          <TouchableOpacity style={styles.input} onPress={abrirCalendario}>
+            <Text style={{ color: "#000", fontSize: 15 }}>
+              {formatearFecha(fecha)}
+            </Text>
+          </TouchableOpacity>
+
+          {showPicker && (
+            <DateTimePicker
+              value={fecha}
+              mode="date"
+              display={Platform.OS === "ios" ? "spinner" : "calendar"}
+              onChange={onChangeFecha}
+              maximumDate={new Date()}
+            />
+          )}
 
           <TouchableOpacity style={styles.boton} onPress={actualizar}>
             <Text style={styles.textoBoton}>Actualizar</Text>
@@ -139,7 +174,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: "#ccc",
     borderRadius: 8,
-    padding: 10,
+    padding: 12,
     fontSize: 15,
   },
   boton: {
