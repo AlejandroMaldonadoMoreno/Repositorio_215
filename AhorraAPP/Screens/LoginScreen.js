@@ -27,20 +27,28 @@ export default function LoginScreen() {
     }
     const validacionRegistro=()=>{
         if(nombre.trim() === '' && apellidos.trim() === '' && telefono.trim() === '' && correo.trim() === '' && contrasenia.trim() === '' && alertas === false){
-            Alert.alert("Error los campos estan en blanco (Móvil)");
+            Alert.alert("Error los campos estan en blanco");
             return false;
         }
         if(!correo.includes('@') || !correo.includes('.')){
-            Alert.alert("El correo no es valido (Móvil)");
+            Alert.alert("El correo no es valido");
             return false;
         }
-        if(telefono.length < 10){
-            Alert.alert("El número de teléfono no es válido (Móvil)");
+        if(telefono.length < 12){
+            Alert.alert("El número de teléfono no es válido");
             return false;
         }
 
         if( nombre === ''){
-            Alert.alert("El número de teléfono no es válido (Móvil)");
+            Alert.alert("El número de teléfono no es válido");
+            return false;
+        }
+        if ( apellidos === ''){
+            Alert.alert("El número de teléfono no es válido");
+            return false;
+        }
+        if(alertas === false){
+            Alert.alert("Debe aceptar recibir alertas de presupuesto");
             return false;
         }
 
