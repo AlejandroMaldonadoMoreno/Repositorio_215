@@ -59,7 +59,10 @@ export default function StatusScreen() {
     const [onConfirmAction, setOnConfirmAction] = useState(() => () => {});
 
     const handleAddBudget = () => {
-        if (!newBudgetName.trim() || !newBudgetAmount.trim()) return;
+        if (!newBudgetName.trim() || !newBudgetAmount.trim()) {
+            Alert.alert('Error', 'Por favor, completa todos los campos antes de guardar.');
+            return;
+        }
         const id = `b${Date.now()}`;
         setBudgets(prev => [{ id, name: newBudgetName.trim(), amount: newBudgetAmount.trim(), color: '#a8d0e6' }, ...prev]);
         setNewBudgetName('');
