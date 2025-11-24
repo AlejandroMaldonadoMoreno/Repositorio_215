@@ -1,0 +1,15 @@
+Importaciones necesarias
+
+npm install @react-navigation/native
+npm install @react-navigation/native-stack
+npm install react-native-gesture-handler
+npm install react-native-reanimated
+npm install react-native-screens
+npm install react-native-safe-area-context
+
+npm audit fix
+
+Comandos para que las versiones compatibles se instalen
+
+npx react-native doctor
+npx react-native doctor fix

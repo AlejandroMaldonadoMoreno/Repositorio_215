@@ -1,4 +1,5 @@
 confidencial/
+node_modules/
 file1.txt
 file*
 

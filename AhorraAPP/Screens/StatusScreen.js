@@ -1,4 +1,4 @@
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Modal, TextInput, Alert } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Modal, TextInput } from 'react-native';
 import React, { useState } from 'react';
 
 import Pantalla_Transacciones from './Pantalla_Transacciones.instructions';
@@ -13,16 +13,6 @@ export default function StatusScreen() {
         { id: 'm3', title: 'Movimento 3', tag: 'Recibiste - concepto: Cobro de alquileres', amount: '$ 5,450.00', date: '12 de noviembre de 2025', time: '09:45' },
         { id: 'm4', title: 'Movimento 4', tag: 'Pagaste - concepto: Compra de libros', amount: '$ 1,000.13', date: '11 de noviembre de 2025', time: '16:20' },
     ]);
-
-    const showConfirm = (title, message, action) => {
-        setConfirmTitle(title);
-        setConfirmMessage(message);
-        setOnConfirmAction(() => () => {
-            try { action(); } finally { setConfirmVisible(false); }
-        });
-        setConfirmVisible(true);
-    };
-
 
     // Presupuestos Mensuales
     const [monthlyBudgets, setMonthlyBudgets] = useState([
@@ -51,27 +41,10 @@ export default function StatusScreen() {
     // sortType controls ordering (only one at a time)
     const [sortType, setSortType] = useState('fechaReciente');
     // Internal confirmation modal state (works across platforms)
-    const [confirmVisible, setConfirmVisible] = useState(false);
-    const [confirmTitle, setConfirmTitle] = useState('');
-    const [confirmMessage, setConfirmMessage] = useState('');
-    const [onConfirmAction, setOnConfirmAction] = useState(() => () => {});
-
-
-    const handleAddBudget = () => {
-        if (!newBudgetName.trim() || !newBudgetAmount.trim()) {
-            Alert.alert('Error', 'Por favor, completa todos los campos antes de guardar.');
-            return;
-        }
-        const id = `b${Date.now()}`;
-        setBudgets(prev => [{ id, name: newBudgetName.trim(), amount: newBudgetAmount.trim(), color: '#a8d0e6' }, ...prev]);
-        setNewBudgetName('');
-        setNewBudgetAmount('');
-        setModalVisible(false);
-    };
 
     // Función para ordenar/filtrar movimientos con filtros combinables
     const getOrderedMovimientos = () => {
-        // Helper: parse Spanish date like "14 de noviembre de 2025" and optional time "10:30"
+        // Helper: cambio a español "14 de noviembre de 2025" y hora "10:30" 
         const parseSpanishDateTime = (dateStr, timeStr) => {
             if (!dateStr) return new Date(0);
             const monthMap = {
@@ -333,9 +306,9 @@ export default function StatusScreen() {
                                         <Text style={styles.modalInputLabel}>Hora:</Text>
                                         <Text style={styles.modalInputValue}>{editingMovimiento.time}</Text>
                                     </View>
-                                    <View style={styles.modalButtonsRow}>
+                                    <View>
                                         <TouchableOpacity
-                                            style={[styles.modalButton, {backgroundColor: '#999'}]}
+                                            style={[styles.modalButton]}
                                             onPress={() => setMovimientoModalVisible(false)}
                                         >
                                             <Text style={styles.modalButtonText}>Cerrar</Text>
@@ -593,7 +566,7 @@ export default function StatusScreen() {
 }
 }
 
-
+//CAmbios
 const styles = StyleSheet.create({
     containerMain: {
         flexGrow: 1,
@@ -819,15 +792,7 @@ const styles = StyleSheet.create({
         marginBottom: 12,
         fontStyle: 'italic',
     },
-    monthlySearchInput: {
-        flex: 1,
-        borderWidth: 1,
-        borderColor: '#ccc',
-        borderRadius: 8,
-        paddingHorizontal: 10,
-        paddingVertical: 6,
-        backgroundColor: '#fff',
-    },
+    
     monthlyBudgetItem: {
         backgroundColor: '#f9f9f9',
         borderRadius: 12,
@@ -941,331 +906,7 @@ const styles = StyleSheet.create({
         flexDirection: 'column',
         paddingBottom: 30,
     },
-    movimientoModalContainer: {
-        flex: 1,
-        justifyContent: 'center',
-        alignItems: 'center',
-        marginTop: 50,
-    },
-    movimientoModalContent: {
-        width: '90%',
-        backgroundColor: '#fff',
-        borderRadius: 10,
-        padding: 20,
-        elevation: 5,
-        shadowColor: '#000',
-        shadowOpacity: 0.1,
-        shadowOffset: { width: 0, height: 2 },
-        shadowRadius: 4,
-    },
-    closeButton: {
-        position: 'absolute',
-        top: 10,
-        right: 10,
-        padding: 8,
-        borderRadius: 20,
-        backgroundColor: '#f2f2f2',
-    },
-    closeButtonText: {
-        fontSize: 16,
-        fontWeight: '500',
-        color: '#333',
-    },
-    movimientoInput: {
-        width: '100%',
-        borderWidth: 1,
-        borderColor: '#ddd',
-        borderRadius: 8,
-        padding: 10,
-        marginTop: 10,
-    },
-    movimientoButton: {
-        backgroundColor: '#0a57d9',
-        borderRadius: 8,
-        padding: 12,
-        alignItems: 'center',
-        marginTop: 15,
-    },
-    movimientoButtonText: {
-        color: '#fff',
-        fontWeight: '600',
-    },
-    deleteButton: {
-        backgroundColor: '#d9534f',
-        borderRadius: 8,
-        padding: 12,
-        alignItems: 'center',
-        marginTop: 10,
-    },
-    deleteButtonText: {
-        color: '#fff',
-        fontWeight: '600',
-    },
-    editButton: {
-        backgroundColor: '#007bff',
-        borderRadius: 8,
-        padding: 12,
-        alignItems: 'center',
-        marginTop: 10,
-    },
-    editButtonText: {
-        color: '#fff',
-        fontWeight: '600',
-    },
-    movimientoInfoContainer: {
-        marginTop: 20,
-        width: '100%',
-    },
-    movimientoInfoText: {
-        fontSize: 14,
-        color: '#333',
-        marginBottom: 8,
-    },
-    separator: {
-        height: 1,
-        width: '100%',
-        backgroundColor: '#ddd',
-        marginVertical: 10,
-    },
-    modalTitle: {
-        fontSize: 18,
-        fontWeight: '600',
-        color: '#0a57d9',
-        marginBottom: 15,
-    },
-    modalSubtitle: {
-        fontSize: 14,
-        color: '#666',
-        marginBottom: 20,
-    },
-    movimientoDetailContainer: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        paddingVertical: 10,
-    },
-    movimientoDetailLabel: {
-        fontSize: 14,
-        color: '#333',
-        fontWeight: '500',
-    },
-    movimientoDetailValue: {
-        fontSize: 14,
-        color: '#007bff',
-        fontWeight: '600',
-    },
-    movimientoActionsContainer: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        marginTop: 15,
-    },
-    movimientoActionButton: {
-        flex: 1,
-        marginHorizontal: 5,
-    },
-    movimientoActionText: {
-        textAlign: 'center',
-        fontWeight: '500',
-    },
-    movimientoDeleteButton: {
-        backgroundColor: '#d9534f',
-    },
-    movimientoEditButton: {
-        backgroundColor: '#007bff',
-    },
-    movimientoSaveButton: {
-        backgroundColor: '#28a745',
-    },
-    movimientoCancelButton: {
-        backgroundColor: '#6c757d',
-    },
-    movimientoFormGroup: {
-        width: '100%',
-        marginTop: 10,
-    },
-    movimientoFormLabel: {
-        fontSize: 14,
-        color: '#333',
-        marginBottom: 5,
-    },
-    movimientoFormInput: {
-        width: '100%',
-        borderWidth: 1,
-        borderColor: '#ddd',
-        borderRadius: 8,
-        padding: 10,
-        fontSize: 14,
-    },
-    movimientoFormButton: {
-        backgroundColor: '#0a57d9',
-        borderRadius: 8,
-        padding: 12,
-        alignItems: 'center',
-        marginTop: 15,
-    },
-    movimientoFormButtonText: {
-        color: '#fff',
-        fontWeight: '600',
-    },
-    movimientoDeleteConfirmation: {
-        backgroundColor: '#f8d7da',
-        borderRadius: 8,
-        padding: 15,
-        marginTop: 10,
-    },
-    movimientoDeleteConfirmationText: {
-        color: '#721c24',
-        fontSize: 14,
-        marginBottom: 10,
-    },
-    movimientoDeleteConfirmationButton: {
-        backgroundColor: '#d9534f',
-        borderRadius: 8,
-        padding: 12,
-        alignItems: 'center',
-    },
-    movimientoDeleteConfirmationButtonText: {
-        color: '#fff',
-        fontWeight: '600',
-    },
-    // New styles for editing recent movements modal
-    movimientoModalContainer: {
-        flex: 1,
-        justifyContent: 'center',
-        alignItems: 'center',
-        marginTop: 50,
-    },
-    movimientoModalContent: {
-        width: '90%',
-        backgroundColor: '#fff',
-        borderRadius: 10,
-        padding: 20,
-        elevation: 5,
-        shadowColor: '#000',
-        shadowOpacity: 0.1,
-        shadowOffset: { width: 0, height: 2 },
-        shadowRadius: 4,
-    },
-    movimientoModalCloseButton: {
-        position: 'absolute',
-        top: 10,
-        right: 10,
-        padding: 10,
-        borderRadius: 20,
-        backgroundColor: '#f2f2f2',
-    },
-    movimientoModalCloseButtonText: {
-        fontSize: 16,
-        fontWeight: '500',
-        color: '#333',
-    },
-    movimientoModalTitle: {
-        fontSize: 18,
-        fontWeight: '600',
-        color: '#0a57d9',
-        marginBottom: 15,
-    },
-    movimientoModalSubtitle: {
-        fontSize: 14,
-        color: '#666',
-        marginBottom: 20,
-    },
-    movimientoModalInput: {
-        width: '100%',
-        borderWidth: 1,
-        borderColor: '#ddd',
-        borderRadius: 8,
-        padding: 10,
-        fontSize: 14,
-        marginTop: 10,
-    },
-    movimientoModalButton: {
-        backgroundColor: '#0a57d9',
-        borderRadius: 8,
-        padding: 12,
-        alignItems: 'center',
-        marginTop: 15,
-    },
-    movimientoModalButtonText: {
-        color: '#fff',
-        fontWeight: '600',
-    },
-    movimientoModalDeleteButton: {
-        backgroundColor: '#d9534f',
-        borderRadius: 8,
-        padding: 12,
-        alignItems: 'center',
-        marginTop: 10,
-    },
-    movimientoModalDeleteButtonText: {
-        color: '#fff',
-        fontWeight: '600',
-    },
-    movimientoModalEditButton: {
-        backgroundColor: '#007bff',
-        borderRadius: 8,
-        padding: 12,
-        alignItems: 'center',
-        marginTop: 10,
-    },
-    movimientoModalEditButtonText: {
-        color: '#fff',
-        fontWeight: '600',
-    },
-    movimientoModalActionsContainer: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        marginTop: 15,
-    },
-    movimientoModalActionButton: {
-        flex: 1,
-        marginHorizontal: 5,
-    },
-    movimientoModalActionText: {
-        textAlign: 'center',
-        fontWeight: '500',
-    },
-    movimientoModalDeleteConfirmation: {
-        backgroundColor: '#f8d7da',
-        borderRadius: 8,
-        padding: 15,
-        marginTop: 10,
-    },
-    movimientoModalDeleteConfirmationText: {
-        color: '#721c24',
-        fontSize: 14,
-        marginBottom: 10,
-    },
-    movimientoModalDeleteConfirmationButton: {
-        backgroundColor: '#d9534f',
-        borderRadius: 8,
-        padding: 12,
-        alignItems: 'center',
-    },
-    movimientoModalDeleteConfirmationButtonText: {
-        color: '#fff',
-        fontWeight: '600',
-    },
-    // Additional styles for movimiento detail modal
-    modalOverlay: {
-        flex: 1,
-        justifyContent: 'center',
-        alignItems: 'center',
-        backgroundColor: 'rgba(0, 0, 0, 0.7)',
-    },
-    modalContainer: {
-        width: '90%',
-        backgroundColor: '#fff',
-        borderRadius: 10,
-        padding: 20,
-        elevation: 5,
-        shadowColor: '#000',
-        shadowOpacity: 0.1,
-        shadowOffset: { width: 0, height: 2 },
-        shadowRadius: 4,
-    },
+    
     modalInputLabel: {
         fontSize: 14,
         color: '#333',
