@@ -6,19 +6,13 @@ import Pantalla_Transacciones from './Pantalla_Transacciones.instructions';
 
 export default function StatusScreen() {
     const[screen, setScreen] = useState('status');
-    const [editMode, setEditMode] = useState(false);
 
     const [movimientos, setMovimientos] = useState([
-        { id: 'm1', title: 'Movimento 1', tag: 'Pagaste - concepto:', amount: '$ 25,000.75' },
-        { id: 'm2', title: 'Movimento 2', tag: 'Recibiste - concepto:', amount: '$ 45,000.13' },
-        { id: 'm3', title: 'Movimento 3', tag: 'Recibiste - concepto:', amount: '$ 5,450.00' },
-        { id: 'm4', title: 'Movimento 4', tag: 'Pagaste - concepto:', amount: '$ 1,000.13' },
+        { id: 'm1', title: 'Movimento 1', tag: 'Pagaste - concepto: Pago del auto', amount: '$ 25,000.75', date: '14 de noviembre de 2025', time: '10:30' },
+        { id: 'm2', title: 'Movimento 2', tag: 'Recibiste - concepto: Venta de bicicleta', amount: '$ 45,000.13', date: '13 de noviembre de 2025', time: '14:15' },
+        { id: 'm3', title: 'Movimento 3', tag: 'Recibiste - concepto: Cobro de alquileres', amount: '$ 5,450.00', date: '12 de noviembre de 2025', time: '09:45' },
+        { id: 'm4', title: 'Movimento 4', tag: 'Pagaste - concepto: Compra de libros', amount: '$ 1,000.13', date: '11 de noviembre de 2025', time: '16:20' },
     ]);
-
-    const handleDeleteMovimiento = (id) => {
-        // eliminar del estado local
-        setMovimientos(prev => prev.filter(m => m.id !== id));
-    };
 
     const showConfirm = (title, message, action) => {
         setConfirmTitle(title);
@@ -29,34 +23,39 @@ export default function StatusScreen() {
         setConfirmVisible(true);
     };
 
-    const confirmDeleteMovimiento = (id) => {
-        const mov = movimientos.find(m => m.id === id);
-        showConfirm(
-            'Eliminar movimiento',
-            `¿Estás seguro que quieres eliminar "${mov?.title || 'este movimiento'}"?`,
-            () => handleDeleteMovimiento(id)
-        );
-    };
 
-    // Presupuestos (budget) state
-    const [budgets, setBudgets] = useState([
-        { id: 'b1', name: 'Otros', amount: '2000.00', color: '#51e5ffff' },
-        { id: 'b2', name: 'Comida', amount: '1000.40', color: '#57ff98ff' },
-        { id: 'b3', name: 'Ocio', amount: '1500.10', color: '#ffbe54ff' },
-        { id: 'b4', name: 'Agua', amount: '1500.00', color: '#ce84ffff' },
-        { id: 'b5', name: 'Luz', amount: '2060.40', color: '#fffb8bff' },
-        { id: 'b6', name: 'Internet', amount: '1500.10', color: '#ff9fd0ff' },
+    // Presupuestos Mensuales
+    const [monthlyBudgets, setMonthlyBudgets] = useState([
+        { id: 'mb1', concept: 'Alimentación', limit: '500.00', spent: '100.50', month: new Date().getMonth() + 1, year: new Date().getFullYear() },
+        { id: 'mb2', concept: 'Transporte', limit: '200.00', spent: '150.00', month: new Date().getMonth() + 1, year: new Date().getFullYear() },
+        { id: 'mb3', concept: 'Entretenimiento', limit: '300.00', spent: '290.75', month: new Date().getMonth() + 1, year: new Date().getFullYear() },
+        { id: 'mb4', concept: 'Videjuegos', limit: '600.00', spent: '200.00', month: new Date().getMonth() + 1, year: new Date().getFullYear() },
+
     ]);
 
-    const [budgetEditMode, setBudgetEditMode] = useState(false);
-    const [modalVisible, setModalVisible] = useState(false);
-    const [newBudgetName, setNewBudgetName] = useState('');
-    const [newBudgetAmount, setNewBudgetAmount] = useState('');
+    const [monthlyModalVisible, setMonthlyModalVisible] = useState(false);
+    const [editingMonthlyId, setEditingMonthlyId] = useState(null);
+    const [newMonthlyCategory, setNewMonthlyCategory] = useState('');
+    const [newMonthlyLimit, setNewMonthlyLimit] = useState('');
+    const [newMonthlySpent, setNewMonthlySpent] = useState('0.00');
+    // Monthly budgets filters/sorting/search
+    const [monthlyFilterModalVisible, setMonthlyFilterModalVisible] = useState(false);
+    const [monthlySortType, setMonthlySortType] = useState('riesgoMayor'); // riesgoMayor/riesgoMenor
+    const [monthlyRiskFilters, setMonthlyRiskFilters] = useState({ bajo: false, alto: false });
+    const [monthlySearchTerm, setMonthlySearchTerm] = useState('');
+    const [movimientoModalVisible, setMovimientoModalVisible] = useState(false);
+    const [editingMovimiento, setEditingMovimiento] = useState(null);
+    const [orderModalVisible, setOrderModalVisible] = useState(false);
+    // filters can be combined (payments, received)
+    const [filters, setFilters] = useState({ tipoPago: false, tipoRecibido: false });
+    // sortType controls ordering (only one at a time)
+    const [sortType, setSortType] = useState('fechaReciente');
     // Internal confirmation modal state (works across platforms)
     const [confirmVisible, setConfirmVisible] = useState(false);
     const [confirmTitle, setConfirmTitle] = useState('');
     const [confirmMessage, setConfirmMessage] = useState('');
     const [onConfirmAction, setOnConfirmAction] = useState(() => () => {});
+
 
     const handleAddBudget = () => {
         if (!newBudgetName.trim() || !newBudgetAmount.trim()) {
@@ -70,17 +69,126 @@ export default function StatusScreen() {
         setModalVisible(false);
     };
 
-    const handleDeleteBudget = (id) => {
-        setBudgets(prev => prev.filter(b => b.id !== id));
+    // Función para ordenar/filtrar movimientos con filtros combinables
+    const getOrderedMovimientos = () => {
+        // Helper: parse Spanish date like "14 de noviembre de 2025" and optional time "10:30"
+        const parseSpanishDateTime = (dateStr, timeStr) => {
+            if (!dateStr) return new Date(0);
+            const monthMap = {
+                enero: 0, febrero: 1, marzo: 2, abril: 3, mayo: 4, junio: 5,
+                julio: 6, agosto: 7, septiembre: 8, octubre: 9, noviembre: 10, diciembre: 11
+            };
+            try {
+                const m = dateStr.toString().toLowerCase().match(/(\d{1,2})\s+de\s+([a-zñ]+)\s+de\s+(\d{4})/i);
+                if (m) {
+                    const day = parseInt(m[1], 10);
+                    const monthName = m[2];
+                    const year = parseInt(m[3], 10);
+                    const month = monthMap[monthName] !== undefined ? monthMap[monthName] : 0;
+                    let hours = 0, minutes = 0;
+                    if (timeStr) {
+                        const t = timeStr.toString().match(/(\d{1,2}):(\d{2})/);
+                        if (t) { hours = parseInt(t[1], 10); minutes = parseInt(t[2], 10); }
+                    }
+                    return new Date(year, month, day, hours, minutes);
+                }
+                // Fallback to Date parsing if format differs
+                const fallback = new Date(dateStr);
+                if (!isNaN(fallback)) return fallback;
+            } catch (e) {}
+            return new Date(0);
+        };
+
+        let arr = [...movimientos];
+
+        // Apply type filters first (if any selected)
+        if (filters.tipoPago || filters.tipoRecibido) {
+            arr = arr.filter(m => {
+                const tag = (m.tag || '').toLowerCase();
+                const isPago = tag.includes('paga') || tag.includes('pagaste');
+                const isRecibido = tag.includes('recibi') || tag.includes('recibiste');
+                return (filters.tipoPago && isPago) || (filters.tipoRecibido && isRecibido);
+            });
+        }
+
+        // Apply sorting
+        if (sortType === 'fechaReciente') {
+            arr.sort((a, b) => parseSpanishDateTime(b.date, b.time) - parseSpanishDateTime(a.date, a.time));
+        } else if (sortType === 'fechaAntigua') {
+            arr.sort((a, b) => parseSpanishDateTime(a.date, a.time) - parseSpanishDateTime(b.date, b.time));
+        } else if (sortType === 'montoMenor') {
+            arr.sort((a, b) => parseFloat(a.amount.replace(/[^\d.]/g, '')) - parseFloat(b.amount.replace(/[^\d.]/g, '')));
+        } else if (sortType === 'montoMayor') {
+            arr.sort((a, b) => parseFloat(b.amount.replace(/[^\d.]/g, '')) - parseFloat(a.amount.replace(/[^\d.]/g, '')));
+        }
+
+        return arr;
+
     };
 
-    const confirmDeleteBudget = (id) => {
-        const bud = budgets.find(b => b.id === id);
-        showConfirm(
-            'Eliminar presupuesto',
-            `¿Eliminar el presupuesto "${bud?.name || 'este presupuesto'}"?`,
-            () => handleDeleteBudget(id)
-        );
+    // CRUD Operations for Monthly Budgets
+    const handleAddMonthlyBudget = () => {
+        if (!newMonthlyCategory.trim() || !newMonthlyLimit.trim()) return;
+        
+        const id = `mb${Date.now()}`;
+        const currentMonth = new Date().getMonth() + 1;
+        const currentYear = new Date().getFullYear();
+        
+        setMonthlyBudgets(prev => [{ 
+            id, 
+            concept: newMonthlyCategory.trim(), 
+            limit: newMonthlyLimit.trim(), 
+            spent: newMonthlySpent || '0.00',
+            month: currentMonth,
+            year: currentYear
+        }, ...prev]);
+        
+        setNewMonthlyCategory('');
+        setNewMonthlyLimit('');
+        setNewMonthlySpent('0.00');
+        setEditingMonthlyId(null);
+        setMonthlyModalVisible(false);
+    };
+
+
+    const getPercentageSpent = (spent, limit) => {
+        return Math.min(Math.round((parseFloat(spent) / parseFloat(limit)) * 100), 100);
+    };
+
+    const getProgressColor = (percentage) => {
+        if (percentage <= 50) return '#36d36c';
+        if (percentage <= 80) return '#ffbe54';
+        return '#d9534f';
+    };
+
+    // Get filtered + sorted monthly budgets according to search, risk filters and sort type
+    const getFilteredMonthlyBudgets = () => {
+        let arr = [...monthlyBudgets];
+
+        // Search by concept (live)
+        if (monthlySearchTerm && monthlySearchTerm.trim() !== '') {
+            const term = monthlySearchTerm.trim().toLowerCase();
+            arr = arr.filter(mb => (mb.concept || '').toLowerCase().includes(term));
+        }
+
+        // Apply risk filters if any
+        if (monthlyRiskFilters.bajo || monthlyRiskFilters.alto) {
+            arr = arr.filter(mb => {
+                const pct = getPercentageSpent(mb.spent, mb.limit);
+                const isBajo = pct <= 50;
+                const isAlto = pct >= 80;
+                return (monthlyRiskFilters.bajo && isBajo) || (monthlyRiskFilters.alto && isAlto);
+            });
+        }
+
+        // Apply sorting by riesgo (only these two now)
+        if (monthlySortType === 'riesgoMayor') {
+            arr.sort((a, b) => getPercentageSpent(b.spent, b.limit) - getPercentageSpent(a.spent, a.limit));
+        } else if (monthlySortType === 'riesgoMenor') {
+            arr.sort((a, b) => getPercentageSpent(a.spent, a.limit) - getPercentageSpent(b.spent, b.limit));
+        }
+
+        return arr;
     };
 
     switch (screen) {
@@ -102,7 +210,7 @@ export default function StatusScreen() {
 
                     <Text style={styles.titleMoney}>$ 25,000.75</Text>
                     <TouchableOpacity 
-                        style={styles.boton}
+                        style={styles.botonTransacciones}
                         onPress={() => setScreen('transacciones')}
 
                     >
@@ -115,21 +223,63 @@ export default function StatusScreen() {
 
                     <View style={styles.movimientosContainer}>
                         <Text style={styles.titleTag}> Movimientos Recientes</Text>
-                        <TouchableOpacity style={styles.movimientosBoton}>
+                        <TouchableOpacity 
+                            style={styles.movimientosBoton}
+                            onPress={() => setOrderModalVisible(true)}
+                        >
                             <Text style={styles.movimientosBotonText}> Ordenar por..</Text>
                         </TouchableOpacity>
-                        <TouchableOpacity
-                            style={[styles.movimientosBoton, editMode ? styles.movimientosBotonActive : null]}
-                            onPress={() => setEditMode(prev => !prev)}
-                        >
-                            <Text style={styles.movimientosBotonText}>{editMode ? 'Listo' : 'Editar'}</Text>
-                        </TouchableOpacity>
+                        
                     </View>
+                    {/* Monthly budgets filter modal */}
+                    <Modal
+                        visible={monthlyFilterModalVisible}
+                        transparent={true}
+                        animationType="fade"
+                        onRequestClose={() => setMonthlyFilterModalVisible(false)}
+                    >
+                        <View style={styles.modalOverlay}>
+                            <View style={styles.modalContainer}>
+                                <Text style={styles.titleTag}>Filtros Presupuestos</Text>
+                                <Text style={styles.modalSubtitle}>Riesgo (puede seleccionar varios):</Text>
+                                <TouchableOpacity
+                                    style={styles.orderOption}
+                                    onPress={() => setMonthlyRiskFilters(prev => ({...prev, bajo: !prev.bajo}))}
+                                >
+                                    <Text style={styles.orderOptionText}>{monthlyRiskFilters.bajo ? '☑' : '☐'} Bajo (≤50%)</Text>
+                                </TouchableOpacity>
+                                <TouchableOpacity
+                                    style={styles.orderOption}
+                                    onPress={() => setMonthlyRiskFilters(prev => ({...prev, alto: !prev.alto}))}
+                                >
+                                    <Text style={styles.orderOptionText}>{monthlyRiskFilters.alto ? '☑' : '☐'} Alto (≥80%)</Text>
+                                </TouchableOpacity>
 
-                    <View style={styles.textDateContainer}>
-                        <Text style={styles.dateTag}>24 de diciembre del 2025</Text>
-                    </View>
+                                <Text style={[styles.modalSubtitle, {marginTop: 10}]}>Ordenar por riesgo:</Text>
+                                <TouchableOpacity style={styles.orderOption} onPress={() => { setMonthlySortType('riesgoMayor'); setMonthlyFilterModalVisible(false); }}>
+                                    <Text style={styles.orderOptionText}>🔥 Riesgo (mayor a menor)</Text>
+                                </TouchableOpacity>
+                                <TouchableOpacity style={styles.orderOption} onPress={() => { setMonthlySortType('riesgoMenor'); setMonthlyFilterModalVisible(false); }}>
+                                    <Text style={styles.orderOptionText}>❄️ Riesgo (menor a mayor)</Text>
+                                </TouchableOpacity>
 
+                                <View style={{flexDirection: 'row', justifyContent: 'space-between', marginTop: 12}}>
+                                    <TouchableOpacity
+                                        style={[styles.modalButton, {backgroundColor: '#6c757d', flex: 1, marginRight: 8}]}
+                                        onPress={() => { setMonthlyRiskFilters({ bajo: false, alto: false }); setMonthlySortType('riesgoMayor'); setMonthlyFilterModalVisible(false); }}
+                                    >
+                                        <Text style={styles.modalButtonText}>Limpiar</Text>
+                                    </TouchableOpacity>
+                                    <TouchableOpacity
+                                        style={[styles.modalButton, {backgroundColor: '#0a57d9', flex: 1}]}
+                                        onPress={() => setMonthlyFilterModalVisible(false)}
+                                    >
+                                        <Text style={styles.modalButtonText}>Aplicar</Text>
+                                    </TouchableOpacity>
+                                </View>
+                            </View>
+                        </View>
+                    </Modal>
 
                     <ScrollView 
                         nestedScrollEnabled={true}
@@ -137,116 +287,58 @@ export default function StatusScreen() {
                         style={styles.movimientosScroll}
                     >
 
-                        {movimientos.map(m => (
-                            <View key={m.id} style={styles.movimientoDatoContainer}>
-                                <View>
+                        {getOrderedMovimientos().map(m => (
+                            <TouchableOpacity
+                                key={m.id}
+                                style={styles.movimientoDatoContainer}
+                                onPress={() => {
+                                    setEditingMovimiento(m);
+                                    setMovimientoModalVisible(true);
+                                }}
+                            >
+                                <View style={{flex: 1}}>
                                     <Text style={styles.movimientoTag}>{m.title}</Text>
                                     <Text style={styles.tag}> {m.tag} </Text>
+                                    <Text style={styles.movimientoFecha}>{m.date} - {m.time}</Text>
                                 </View>
                                 <View style={styles.tipoMovimientoContainer}>
                                     <Text style={styles.money}>{m.amount}</Text>
-                                    {editMode && (
-                                        <TouchableOpacity
-                                            style={styles.deleteBoton}
-                                            onPress={() => confirmDeleteMovimiento(m.id)}
-                                        >
-                                            <Text style={styles.deleteText}>X</Text>
-                                        </TouchableOpacity>
-                                    )}
                                 </View>
-                            </View>
+                            </TouchableOpacity>
                         ))}
                         
-                    </ScrollView>  
-                </View>
-
-
-                <View style={styles.dataContainer}>
-                    <View style={[styles.textPresupuestoContainer, {justifyContent: 'space-between', alignItems: 'center'}]}>
-                        <Text style={styles.titleTag}> Presupuesto</Text>
-                        <TouchableOpacity
-                            style={[styles.movimientosBoton, budgetEditMode ? styles.movimientosBotonActive : null]}
-                            onPress={() => setBudgetEditMode(prev => !prev)}
-                        >
-                            <Text style={styles.movimientosBotonText}>{budgetEditMode ? 'Listo' : 'Editar'}</Text>
-                        </TouchableOpacity>
-                    </View>
-                    <ScrollView 
-                        style={styles.presupuestoScroll}
-                        showsHorizontalScrollIndicator={false}
-                        nestedScrollEnabled={true}
-                    >
-                        <View style={styles.presupuestoScrollRow}>
-                            <TouchableOpacity style={styles.addBox} onPress={() => setModalVisible(true)}>
-                                <Text style={styles.addPlus}>+</Text>
-                            </TouchableOpacity>
-
-                            {budgets.map(b => (
-                                <View key={b.id} style={[styles.presupuestoItem, {backgroundColor: b.color}] }>
-                                    <Text style={styles.movimientoTag}>{b.name}</Text>
-                                    <Text style={styles.money}>$ {b.amount}</Text>
-                                    {budgetEditMode && (
-                                        <TouchableOpacity style={styles.deleteBoton} onPress={() => confirmDeleteBudget(b.id)}>
-                                            <Text style={styles.deleteText}>X</Text>
-                                        </TouchableOpacity>
-                                    )}
-                                </View>
-                            ))}
-                        </View>
                     </ScrollView>
 
-                    <Modal
-                        visible={modalVisible}
-                        transparent={true}
-                        animationType="slide"
-                        onRequestClose={() => setModalVisible(false)}
-                    >
-                        <View style={styles.modalOverlay}>
-                            <View style={styles.modalContainer}>
-                                <Text style={styles.titleTag}>Crear Presupuesto</Text>
-                                <TextInput
-                                    placeholder="Nombre"
-                                    value={newBudgetName}
-                                    onChangeText={setNewBudgetName}
-                                    style={styles.modalInput}
-                                />
-                                <TextInput
-                                    placeholder="Monto"
-                                    value={newBudgetAmount}
-                                    onChangeText={setNewBudgetAmount}
-                                    keyboardType="numeric"
-                                    style={styles.modalInput}
-                                />
-                                <View style={styles.modalButtonsRow}>
-                                    <TouchableOpacity style={[styles.modalButton, {backgroundColor: '#0a57d9'}]} onPress={handleAddBudget}>
-                                        <Text style={styles.modalButtonText}>Guardar</Text>
-                                    </TouchableOpacity>
-                                    <TouchableOpacity style={[styles.modalButton, {backgroundColor: '#999'}]} onPress={() => setModalVisible(false)}>
-                                        <Text style={styles.modalButtonText}>Cancelar</Text>
-                                    </TouchableOpacity>
-                                </View>
-                            </View>
-                        </View>
-                    </Modal>
-
-                    {/* Confirmation modal (internal) */}
-                    {confirmVisible && (
+                    {/* Modal de información de movimiento */}
+                    {movimientoModalVisible && editingMovimiento && (
                         <Modal
-                            visible={confirmVisible}
+                            visible={movimientoModalVisible}
                             transparent={true}
                             animationType="fade"
-                            onRequestClose={() => setConfirmVisible(false)}
+                            onRequestClose={() => setMovimientoModalVisible(false)}
                         >
                             <View style={styles.modalOverlay}>
-                                <View style={[styles.modalContainer, styles.confirmContainer]}>
-                                    <Text style={styles.titleTag}>{confirmTitle}</Text>
-                                    <Text style={{marginTop:10, textAlign:'center'}}>{confirmMessage}</Text>
+                                <View style={styles.modalContainer}>
+                                    <Text style={styles.titleTag}>{editingMovimiento.tag}</Text>
+                                    <View style={styles.modalInfoSection}>
+                                        <Text style={styles.modalInputLabel}>Título:</Text>
+                                        <Text style={styles.modalInputValue}>{editingMovimiento.title}</Text>
+                                        
+                                        <Text style={styles.modalInputLabel}>Monto:</Text>
+                                        <Text style={styles.modalInputValue}>{editingMovimiento.amount}</Text>
+                                        
+                                        <Text style={styles.modalInputLabel}>Fecha:</Text>
+                                        <Text style={styles.modalInputValue}>{editingMovimiento.date}</Text>
+                                        
+                                        <Text style={styles.modalInputLabel}>Hora:</Text>
+                                        <Text style={styles.modalInputValue}>{editingMovimiento.time}</Text>
+                                    </View>
                                     <View style={styles.modalButtonsRow}>
-                                        <TouchableOpacity style={[styles.modalButton, {backgroundColor: '#999'}]} onPress={() => setConfirmVisible(false)}>
-                                            <Text style={styles.modalButtonText}>Cancelar</Text>
-                                        </TouchableOpacity>
-                                        <TouchableOpacity style={[styles.modalButton, {backgroundColor: '#d9534f'}]} onPress={() => onConfirmAction()}>
-                                            <Text style={styles.modalButtonText}>Eliminar</Text>
+                                        <TouchableOpacity
+                                            style={[styles.modalButton, {backgroundColor: '#999'}]}
+                                            onPress={() => setMovimientoModalVisible(false)}
+                                        >
+                                            <Text style={styles.modalButtonText}>Cerrar</Text>
                                         </TouchableOpacity>
                                     </View>
                                 </View>
@@ -254,6 +346,242 @@ export default function StatusScreen() {
                         </Modal>
                     )}
 
+                    {/* Modal de ordenar/filtrar (combinable) */}
+                    <Modal
+                        visible={orderModalVisible}
+                        transparent={true}
+                        animationType="fade"
+                        onRequestClose={() => setOrderModalVisible(false)}
+                    >
+                        <View style={styles.modalOverlay}>
+                            <View style={styles.modalContainer}>
+                                <Text style={styles.titleTag}>Ordenar/Filtrar por:</Text>
+
+                                <Text style={[styles.modalSubtitle, {marginTop: 5}]}>Filtrar por tipo (puede seleccionar varios):</Text>
+                                <TouchableOpacity
+                                    style={styles.orderOption}
+                                    onPress={() => setFilters(prev => ({...prev, tipoPago: !prev.tipoPago}))}
+                                >
+                                    <Text style={styles.orderOptionText}>{filters.tipoPago ? '☑' : '☐'} 💸 Solo pagos</Text>
+                                </TouchableOpacity>
+                                <TouchableOpacity
+                                    style={styles.orderOption}
+                                    onPress={() => setFilters(prev => ({...prev, tipoRecibido: !prev.tipoRecibido}))}
+                                >
+                                    <Text style={styles.orderOptionText}>{filters.tipoRecibido ? '☑' : '☐'} 💵 Solo recibidos</Text>
+                                </TouchableOpacity>
+
+                                <Text style={[styles.modalSubtitle, {marginTop: 10}]}>Ordenar por (elige uno):</Text>
+                                <TouchableOpacity
+                                    style={styles.orderOption}
+                                    onPress={() => { setSortType('fechaReciente'); setOrderModalVisible(false); }}
+                                >
+                                    <Text style={styles.orderOptionText}>📅 Fecha más reciente</Text>
+                                </TouchableOpacity>
+                                <TouchableOpacity
+                                    style={styles.orderOption}
+                                    onPress={() => { setSortType('fechaAntigua'); setOrderModalVisible(false); }}
+                                >
+                                    <Text style={styles.orderOptionText}>📅 Fecha más antigua</Text>
+                                </TouchableOpacity>
+                                <TouchableOpacity
+                                    style={styles.orderOption}
+                                    onPress={() => { setSortType('montoMenor'); setOrderModalVisible(false); }}
+                                >
+                                    <Text style={styles.orderOptionText}>💰 Monto menor a mayor</Text>
+                                </TouchableOpacity>
+                                <TouchableOpacity
+                                    style={styles.orderOption}
+                                    onPress={() => { setSortType('montoMayor'); setOrderModalVisible(false); }}
+                                >
+                                    <Text style={styles.orderOptionText}>💰 Monto mayor a menor</Text>
+                                </TouchableOpacity>
+
+                                <View style={{flexDirection: 'row', justifyContent: 'space-between', marginTop: 12}}>
+                                    <TouchableOpacity
+                                        style={[styles.modalButton, {backgroundColor: '#6c757d', flex: 1, marginRight: 8}]}
+                                        onPress={() => { setFilters({ tipoPago: false, tipoRecibido: false }); setSortType('fechaReciente'); }}
+                                    >
+                                        <Text style={styles.modalButtonText}>Limpiar</Text>
+                                    </TouchableOpacity>
+                                    <TouchableOpacity
+                                        style={[styles.modalButton, {backgroundColor: '#0a57d9', flex: 1}]}
+                                        onPress={() => setOrderModalVisible(false)}
+                                    >
+                                        <Text style={styles.modalButtonText}>Aplicar</Text>
+                                    </TouchableOpacity>
+                                </View>
+                            </View>
+                        </View>
+                    </Modal>
+                </View>
+
+                {/* Monthly Budgets Section */}
+                <View style={styles.dataContainer}>
+                    <View style={[styles.textPresupuestoContainer, {justifyContent: 'space-between', alignItems: 'center'}]}>
+                        <Text style={styles.titleTag}> Presupuestos Mensuales</Text>
+                    </View>
+
+                                <Text style={styles.monthlyBudgetInfo}>
+                                    Mes actual: {new Date().toLocaleDateString('es-CO', { month: 'long', year: 'numeric' })}
+                                </Text>
+
+                                <View style={styles.presupuestoContainer}>
+                                    <TextInput
+                                        placeholder="Buscar por concepto..."
+                                        value={monthlySearchTerm}
+                                        onChangeText={setMonthlySearchTerm}
+                                        style={styles.presupuestoInput}
+                                    />
+                                    <TouchableOpacity
+                                        style={styles.presupuestoBoton}
+                                        onPress={() => setMonthlyFilterModalVisible(true)}
+                                    >
+                                        <Text style={styles.presupuestoBotonText}>Filtros</Text>
+                                    </TouchableOpacity>
+                                </View>
+
+                    <ScrollView
+                        style={styles.monthlyBudgetScroll}
+                        contentContainerStyle={styles.monthlyBudgetScrollContent}
+                        nestedScrollEnabled={true}
+                        showsVerticalScrollIndicator={false}
+                    >
+                        <View style={styles.monthlyBudgetRow}>
+                            {getFilteredMonthlyBudgets().map(mb => {
+                                const percentage = getPercentageSpent(mb.spent, mb.limit);
+                                const progressColor = getProgressColor(percentage);
+                                return (
+                                    <TouchableOpacity
+                                        key={mb.id}
+                                        style={styles.monthlyBudgetItemBox}
+                                        activeOpacity={0.8}
+                                        onPress={() => {
+                                            setEditingMonthlyId(mb.id);
+                                            setNewMonthlyCategory(mb.concept);
+                                            setNewMonthlyLimit(mb.limit);
+                                            setNewMonthlySpent(mb.spent);
+                                            setMonthlyModalVisible(true);
+                                        }}
+                                    >
+                                        <View style={[styles.thermoBackground]}> 
+                                            <View style={[styles.thermoFill, {width: `${percentage}%`, backgroundColor: progressColor}]} />
+                                        </View>
+                                        <View style={styles.monthlyBudgetBoxContent}>
+                                            <View style={styles.monthlyBudgetHeader}>
+                                                <Text style={styles.conceptTitle}>{mb.concept}</Text>
+                                            </View>
+                                            <View style={styles.monthlyBudgetAmount}>
+                                                <Text style={styles.spentAmount}>$ {mb.spent} / $ {mb.limit}</Text>
+                                                <Text style={styles.percentageText}>{percentage}%</Text>
+                                            </View>
+                                            <Text style={styles.remainingText}>
+                                                Disponible: $ {(parseFloat(mb.limit) - parseFloat(mb.spent)).toFixed(2)}
+                                            </Text>
+                                        </View>
+                                    </TouchableOpacity>
+                                );
+                            })}
+                        </View>
+                    </ScrollView>
+
+                    {/* Monthly Budget Modal */}
+                    {monthlyModalVisible && (
+                        <Modal
+                            visible={monthlyModalVisible}
+                            transparent={true}
+                            animationType="fade"
+                            onRequestClose={() => setMonthlyModalVisible(false)}
+                        >
+                            <View style={styles.modalOverlay}>
+                                <View style={styles.modalContainer}>
+                                    <Text style={styles.titleTag}>{editingMonthlyId ? 'Editar Presupuesto Mensual' : 'Nuevo Presupuesto Mensual'}</Text>
+                                    
+                                    <Text style={styles.modalInputLabel}>Concepto</Text>
+                                    <TextInput
+                                        placeholder="Ej: Alimentación"
+                                        value={newMonthlyCategory}
+                                        onChangeText={setNewMonthlyCategory}
+                                        style={styles.modalInput}
+                                    />
+                                    
+                                    <Text style={styles.modalInputLabel}>Límite mensual</Text>
+                                    <TextInput
+                                        placeholder="0.00"
+                                        value={newMonthlyLimit}
+                                        onChangeText={setNewMonthlyLimit}
+                                        keyboardType="decimal-pad"
+                                        style={styles.modalInput}
+                                    />
+                                    
+                                    <Text style={styles.modalInputLabel}>Gastado hasta ahora (opcional)</Text>
+                                    <TextInput
+                                        placeholder="0.00"
+                                        value={newMonthlySpent}
+                                        onChangeText={setNewMonthlySpent}
+                                        keyboardType="decimal-pad"
+                                        style={styles.modalInput}
+                                    />
+                                    <View style={styles.modalButtonsRow}>
+                                        <TouchableOpacity
+                                            style={[styles.modalButton, {backgroundColor: '#0a57d9'}]}
+                                            onPress={() => {
+                                                if (editingMonthlyId) {
+                                                    setMonthlyBudgets(prev => prev.map(mb => mb.id === editingMonthlyId ? {
+                                                        ...mb,
+                                                        concept: newMonthlyCategory,
+                                                        limit: newMonthlyLimit,
+                                                        spent: newMonthlySpent
+                                                    } : mb));
+                                                } else {
+                                                    handleAddMonthlyBudget();
+                                                }
+                                                setMonthlyModalVisible(false);
+                                            }}
+                                        >
+                                            <Text style={styles.modalButtonText}>{editingMonthlyId ? 'Actualizar' : 'Guardar'}</Text>
+                                        </TouchableOpacity>
+                                        {editingMonthlyId && (
+                                            <TouchableOpacity
+                                                style={[styles.modalButton, {backgroundColor: '#d9534f'}]}
+                                                onPress={() => {
+                                                    setMonthlyBudgets(prev => prev.filter(mb => mb.id !== editingMonthlyId));
+                                                    setMonthlyModalVisible(false);
+                                                    setEditingMonthlyId(null);
+                                                }}
+                                            >
+                                                <Text style={styles.modalButtonText}>Eliminar</Text>
+                                            </TouchableOpacity>
+                                        )}
+                                        <TouchableOpacity
+                                            style={[styles.modalButton, {backgroundColor: '#999'}]}
+                                            onPress={() => {
+                                                setMonthlyModalVisible(false);
+                                                setEditingMonthlyId(null);
+                                            }}
+                                        >
+                                            <Text style={styles.modalButtonText}>Cancelar</Text>
+                                        </TouchableOpacity>
+                                    </View>
+                                </View>
+                            </View>
+                        </Modal>
+                    )}
+                    <View style={{flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center'}}>
+                        <TouchableOpacity 
+                            style={styles.botonPresupuesto}
+                            onPress={() => {
+                                setNewMonthlyCategory('');
+                                setNewMonthlyLimit('');
+                                setNewMonthlySpent('0.00');
+                                setEditingMonthlyId(null);
+                                setMonthlyModalVisible(true);
+                            }}
+                        >
+                            <Text style={styles.tituloBoton}> Crear Presupuesto </Text>
+                        </TouchableOpacity>
+
+                    </View>
                 </View>
             </View>
         <View style={styles.fondoInferior} />
@@ -264,6 +592,7 @@ export default function StatusScreen() {
   );
 }
 }
+
 
 const styles = StyleSheet.create({
     containerMain: {
@@ -337,81 +666,37 @@ const styles = StyleSheet.create({
         paddingHorizontal: 10,
     },
     presupuestoContainer: {
-        flex: 1,
-        width: '100%',
-        height: '100%',
+        width: '100%', 
+        flexDirection: 'row',  
+        alignItems: 'center',  
         padding: 10,
-        borderRadius: 10,
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        backgroundColor: '#ffffff',
+        justifyContent: 'space-between'
     },
-    presupuestoScroll: {
-        width: '100%',
-        height: '100%',
+    presupuestoBoton: {
+        backgroundColor: '#0a57d9',
+        borderRadius: 30,
+        padding: 10,
         
-    },
-    presupuestoObjectContainer1: {
-        backgroundColor: '#51e5ffff', 
-        justifyContent: 'center',
         alignItems: 'center',
-        padding: 10,
-        borderRadius: 10,
-        borderColor: '#919191ff',
-        borderWidth: 2,
     },
-    presupuestoObjectContainer2: {
-        backgroundColor: '#57ff98ff', 
-        justifyContent: 'center',
+    presupuestoBotonText: {
+        fontSize: 10,
+        fontWeight: '500',
+        color: '#ffffff',
         alignItems: 'center',
-        padding: 10,
-        borderRadius: 10,
-        borderColor: '#919191ff',
-        borderWidth: 2,
     },
-    presupuestoObjectContainer3: {
-        backgroundColor: '#ffbe54ff', 
-        justifyContent: 'center',
-        alignItems: 'center',
+    presupuestoInput: {
+        width: '80%',
+        borderWidth: 1,
+        borderColor: '#ddd',
+        borderRadius: 8,
         padding: 10,
-        borderRadius: 10,
-        borderColor: '#919191ff',
-        borderWidth: 2,
-    },
-    presupuestoObjectContainer4: {
-        backgroundColor: '#ce84ffff', 
-        justifyContent: 'center',
-        alignItems: 'center',
-        padding: 10,
-        borderRadius: 10,
-        borderColor: '#919191ff',
-        borderWidth: 2,
-    },
-    presupuestoObjectContainer5: {
-        backgroundColor: '#fffb8bff', 
-        justifyContent: 'center',
-        alignItems: 'center',
-        padding: 10,
-        borderRadius: 10,
-        borderColor: '#919191ff',
-        borderWidth: 2,
-    },
-    presupuestoObjectContainer6: {
-        backgroundColor: '#ff9fd0ff', 
-        justifyContent: 'center',
-        alignItems: 'center',
-        padding: 10,
-        borderRadius: 10,
-        borderColor: '#919191ff',
-        borderWidth: 2,
+        
     },
     tipoMovimientoContainer: {
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'center',
-        
-        
     },
     deleteText: {
         color: '#ffffff',
@@ -419,14 +704,13 @@ const styles = StyleSheet.create({
         fontSize: 15,
     },
     deleteBoton: {
-        backgroundColor: 'red',
+        backgroundColor: '#d9534f',
         borderRadius: 40,
         justifyContent: 'center',
         alignItems: 'center',
-        paddingHorizontal: 10,
-        paddingVertical: 5,
+        paddingHorizontal: 12,
+        paddingVertical: 8,
         marginLeft: 10,
-        
     },
     movimientoDatoContainer: {
         width: '100%',
@@ -480,6 +764,12 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         
     },
+    movimientoFecha: {
+        fontSize: 9,
+        color: '#999',
+        marginTop: 4,
+        fontStyle: 'italic',
+    },
     money: {
         fontSize: 15,
         fontWeight: '500',
@@ -494,13 +784,22 @@ const styles = StyleSheet.create({
         marginBottom: 20,
         marginTop: 20,
     },
-    boton: {
+    botonTransacciones: {
         backgroundColor: '#0a57d9',
         borderRadius: 40,
         alignItems: 'center',
         justifyContent: 'center',
         width: '100%',
         height: 30,
+    },
+    botonPresupuesto: {
+        backgroundColor: '#0a57d9',
+        borderRadius: 40,
+        alignItems: 'center',
+        justifyContent: 'center',
+        width: '100%',
+        height: 30,
+        marginTop: 30,
     },
     tituloBoton: {
         fontSize: 15,
@@ -510,80 +809,680 @@ const styles = StyleSheet.create({
     movimientosBotonActive: {
         backgroundColor: '#ff8c00',
     },
-    presupuestoScrollRow: {
-        flexDirection: 'row',
-        flexWrap: 'wrap',
-        gap: 10,
-        alignItems: 'flex-start',
-    },
-    addBox: {
-        width: 100,
-        height: 100,
-        borderRadius: 10,
-        borderWidth: 2,
-        borderColor: '#919191ff',
-        justifyContent: 'center',
-        alignItems: 'center',
-        backgroundColor: '#ffffff',
-        marginRight: 10,
-    },
-    addPlus: {
-        fontSize: 40,
-        color: '#0a57d9',
-        fontWeight: '700',
-    },
-    presupuestoItem: {
-        width: 100,
-        height: 100,
-        borderRadius: 10,
-        justifyContent: 'center',
-        alignItems: 'center',
-        padding: 8,
-        marginRight: 10,
-    },
-    modalOverlay: {
-        flex: 1,
-        backgroundColor: 'rgba(0,0,0,0.5)',
-        justifyContent: 'center',
-        alignItems: 'center',
-    },
-    modalContainer: {
-        width: '85%',
-        backgroundColor: '#fff',
-        padding: 20,
-        borderRadius: 10,
-        alignItems: 'center',
-    },
-    modalInput: {
+    monthlyBudgetScroll: {
         width: '100%',
+        maxHeight: 400,
+    },
+    monthlyBudgetInfo: {
+        fontSize: 12,
+        color: '#666',
+        marginBottom: 12,
+        fontStyle: 'italic',
+    },
+    monthlySearchInput: {
+        flex: 1,
         borderWidth: 1,
         borderColor: '#ccc',
-        borderRadius: 6,
+        borderRadius: 8,
+        paddingHorizontal: 10,
+        paddingVertical: 6,
+        backgroundColor: '#fff',
+    },
+    monthlyBudgetItem: {
+        backgroundColor: '#f9f9f9',
+        borderRadius: 12,
+        padding: 14,
+        marginBottom: 12,
+        borderLeftWidth: 4,
+        borderLeftColor: '#0a57d9',
+    },
+    monthlyBudgetItemBox: {
+        width: '90%',
+        maxWidth: 320,
+        minWidth: 180,
+        height: 120,
+        margin: 10,
+        borderRadius: 16,
+        overflow: 'hidden',
+        backgroundColor: '#f2f4f8',
+        elevation: 4,
+        shadowColor: '#000',
+        shadowOpacity: 0.08,
+        shadowOffset: { width: 0, height: 2 },
+        shadowRadius: 6,
+        position: 'relative',
+    },
+    thermoBackground: {
+        position: 'absolute',
+        left: 0,
+        top: 0,
+        bottom: 0,
+        right: 0,
+        backgroundColor: '#e0e0e0',
+        borderRadius: 16,
+        overflow: 'hidden',
+    },
+    thermoFill: {
+        position: 'absolute',
+        left: 0,
+        top: 0,
+        bottom: 0,
+        borderRadius: 16,
+    },
+    monthlyBudgetBoxContent: {
+        flex: 1,
+        zIndex: 2,
+        padding: 14,
+        justifyContent: 'center',
+    },
+    monthlyBudgetHeader: {
+        marginBottom: 4,
+    },
+    conceptTitle: {
+        fontSize: 15,
+        fontWeight: '600',
+        color: '#333',
+    },
+    monthlyBudgetAmount: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        marginBottom: 8,
+    },
+    spentAmount: {
+        fontSize: 13,
+        fontWeight: '600',
+        color: '#333',
+    },
+    percentageText: {
+        fontSize: 13,
+        fontWeight: 'bold',
+        color: '#0a57d9',
+    },
+    progressBarContainer: {
+        width: '100%',
+        height: 8,
+        backgroundColor: '#e0e0e0',
+        borderRadius: 4,
+        overflow: 'hidden',
+        marginBottom: 8,
+    },
+    progressBar: {
+        height: '100%',
+        borderRadius: 4,
+    },
+    remainingText: {
+        fontSize: 11,
+        color: '#666',
+        fontWeight: '500',
+    },
+    addMonthlyButton: {
+        backgroundColor: '#0a57d9',
+        borderRadius: 10,
+        padding: 14,
+        alignItems: 'center',
+        marginTop: 8,
+    },
+    addMonthlyButtonText: {
+        color: '#fff',
+        fontWeight: '600',
+        fontSize: 13,
+    },
+    monthlyBudgetRow: {
+        flexDirection: 'row',
+        flexWrap: 'wrap',
+        justifyContent: 'center',
+        alignItems: 'center',
+        gap: 16,
+    },
+    monthlyBudgetScrollContent: {
+        alignItems: 'center',
+        justifyContent: 'center',
+        flexDirection: 'column',
+        paddingBottom: 30,
+    },
+    movimientoModalContainer: {
+        flex: 1,
+        justifyContent: 'center',
+        alignItems: 'center',
+        marginTop: 50,
+    },
+    movimientoModalContent: {
+        width: '90%',
+        backgroundColor: '#fff',
+        borderRadius: 10,
+        padding: 20,
+        elevation: 5,
+        shadowColor: '#000',
+        shadowOpacity: 0.1,
+        shadowOffset: { width: 0, height: 2 },
+        shadowRadius: 4,
+    },
+    closeButton: {
+        position: 'absolute',
+        top: 10,
+        right: 10,
+        padding: 8,
+        borderRadius: 20,
+        backgroundColor: '#f2f2f2',
+    },
+    closeButtonText: {
+        fontSize: 16,
+        fontWeight: '500',
+        color: '#333',
+    },
+    movimientoInput: {
+        width: '100%',
+        borderWidth: 1,
+        borderColor: '#ddd',
+        borderRadius: 8,
         padding: 10,
         marginTop: 10,
     },
-    modalButtonsRow: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        width: '100%',
+    movimientoButton: {
+        backgroundColor: '#0a57d9',
+        borderRadius: 8,
+        padding: 12,
+        alignItems: 'center',
         marginTop: 15,
     },
-    modalButton: {
-        flex: 1,
-        padding: 10,
-        marginHorizontal: 5,
+    movimientoButtonText: {
+        color: '#fff',
+        fontWeight: '600',
+    },
+    deleteButton: {
+        backgroundColor: '#d9534f',
         borderRadius: 8,
+        padding: 12,
         alignItems: 'center',
+        marginTop: 10,
+    },
+    deleteButtonText: {
+        color: '#fff',
+        fontWeight: '600',
+    },
+    editButton: {
+        backgroundColor: '#007bff',
+        borderRadius: 8,
+        padding: 12,
+        alignItems: 'center',
+        marginTop: 10,
+    },
+    editButtonText: {
+        color: '#fff',
+        fontWeight: '600',
+    },
+    movimientoInfoContainer: {
+        marginTop: 20,
+        width: '100%',
+    },
+    movimientoInfoText: {
+        fontSize: 14,
+        color: '#333',
+        marginBottom: 8,
+    },
+    separator: {
+        height: 1,
+        width: '100%',
+        backgroundColor: '#ddd',
+        marginVertical: 10,
+    },
+    modalTitle: {
+        fontSize: 18,
+        fontWeight: '600',
+        color: '#0a57d9',
+        marginBottom: 15,
+    },
+    modalSubtitle: {
+        fontSize: 14,
+        color: '#666',
+        marginBottom: 20,
+    },
+    movimientoDetailContainer: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        paddingVertical: 10,
+    },
+    movimientoDetailLabel: {
+        fontSize: 14,
+        color: '#333',
+        fontWeight: '500',
+    },
+    movimientoDetailValue: {
+        fontSize: 14,
+        color: '#007bff',
+        fontWeight: '600',
+    },
+    movimientoActionsContainer: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        marginTop: 15,
+    },
+    movimientoActionButton: {
+        flex: 1,
+        marginHorizontal: 5,
+    },
+    movimientoActionText: {
+        textAlign: 'center',
+        fontWeight: '500',
+    },
+    movimientoDeleteButton: {
+        backgroundColor: '#d9534f',
+    },
+    movimientoEditButton: {
+        backgroundColor: '#007bff',
+    },
+    movimientoSaveButton: {
+        backgroundColor: '#28a745',
+    },
+    movimientoCancelButton: {
+        backgroundColor: '#6c757d',
+    },
+    movimientoFormGroup: {
+        width: '100%',
+        marginTop: 10,
+    },
+    movimientoFormLabel: {
+        fontSize: 14,
+        color: '#333',
+        marginBottom: 5,
+    },
+    movimientoFormInput: {
+        width: '100%',
+        borderWidth: 1,
+        borderColor: '#ddd',
+        borderRadius: 8,
+        padding: 10,
+        fontSize: 14,
+    },
+    movimientoFormButton: {
+        backgroundColor: '#0a57d9',
+        borderRadius: 8,
+        padding: 12,
+        alignItems: 'center',
+        marginTop: 15,
+    },
+    movimientoFormButtonText: {
+        color: '#fff',
+        fontWeight: '600',
+    },
+    movimientoDeleteConfirmation: {
+        backgroundColor: '#f8d7da',
+        borderRadius: 8,
+        padding: 15,
+        marginTop: 10,
+    },
+    movimientoDeleteConfirmationText: {
+        color: '#721c24',
+        fontSize: 14,
+        marginBottom: 10,
+    },
+    movimientoDeleteConfirmationButton: {
+        backgroundColor: '#d9534f',
+        borderRadius: 8,
+        padding: 12,
+        alignItems: 'center',
+    },
+    movimientoDeleteConfirmationButtonText: {
+        color: '#fff',
+        fontWeight: '600',
+    },
+    // New styles for editing recent movements modal
+    movimientoModalContainer: {
+        flex: 1,
+        justifyContent: 'center',
+        alignItems: 'center',
+        marginTop: 50,
+    },
+    movimientoModalContent: {
+        width: '90%',
+        backgroundColor: '#fff',
+        borderRadius: 10,
+        padding: 20,
+        elevation: 5,
+        shadowColor: '#000',
+        shadowOpacity: 0.1,
+        shadowOffset: { width: 0, height: 2 },
+        shadowRadius: 4,
+    },
+    movimientoModalCloseButton: {
+        position: 'absolute',
+        top: 10,
+        right: 10,
+        padding: 10,
+        borderRadius: 20,
+        backgroundColor: '#f2f2f2',
+    },
+    movimientoModalCloseButtonText: {
+        fontSize: 16,
+        fontWeight: '500',
+        color: '#333',
+    },
+    movimientoModalTitle: {
+        fontSize: 18,
+        fontWeight: '600',
+        color: '#0a57d9',
+        marginBottom: 15,
+    },
+    movimientoModalSubtitle: {
+        fontSize: 14,
+        color: '#666',
+        marginBottom: 20,
+    },
+    movimientoModalInput: {
+        width: '100%',
+        borderWidth: 1,
+        borderColor: '#ddd',
+        borderRadius: 8,
+        padding: 10,
+        fontSize: 14,
+        marginTop: 10,
+    },
+    movimientoModalButton: {
+        backgroundColor: '#0a57d9',
+        borderRadius: 8,
+        padding: 12,
+        alignItems: 'center',
+        marginTop: 15,
+    },
+    movimientoModalButtonText: {
+        color: '#fff',
+        fontWeight: '600',
+    },
+    movimientoModalDeleteButton: {
+        backgroundColor: '#d9534f',
+        borderRadius: 8,
+        padding: 12,
+        alignItems: 'center',
+        marginTop: 10,
+    },
+    movimientoModalDeleteButtonText: {
+        color: '#fff',
+        fontWeight: '600',
+    },
+    movimientoModalEditButton: {
+        backgroundColor: '#007bff',
+        borderRadius: 8,
+        padding: 12,
+        alignItems: 'center',
+        marginTop: 10,
+    },
+    movimientoModalEditButtonText: {
+        color: '#fff',
+        fontWeight: '600',
+    },
+    movimientoModalActionsContainer: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        marginTop: 15,
+    },
+    movimientoModalActionButton: {
+        flex: 1,
+        marginHorizontal: 5,
+    },
+    movimientoModalActionText: {
+        textAlign: 'center',
+        fontWeight: '500',
+    },
+    movimientoModalDeleteConfirmation: {
+        backgroundColor: '#f8d7da',
+        borderRadius: 8,
+        padding: 15,
+        marginTop: 10,
+    },
+    movimientoModalDeleteConfirmationText: {
+        color: '#721c24',
+        fontSize: 14,
+        marginBottom: 10,
+    },
+    movimientoModalDeleteConfirmationButton: {
+        backgroundColor: '#d9534f',
+        borderRadius: 8,
+        padding: 12,
+        alignItems: 'center',
+    },
+    movimientoModalDeleteConfirmationButtonText: {
+        color: '#fff',
+        fontWeight: '600',
+    },
+    // Additional styles for movimiento detail modal
+    modalOverlay: {
+        flex: 1,
+        justifyContent: 'center',
+        alignItems: 'center',
+        backgroundColor: 'rgba(0, 0, 0, 0.7)',
+    },
+    modalContainer: {
+        width: '90%',
+        backgroundColor: '#fff',
+        borderRadius: 10,
+        padding: 20,
+        elevation: 5,
+        shadowColor: '#000',
+        shadowOpacity: 0.1,
+        shadowOffset: { width: 0, height: 2 },
+        shadowRadius: 4,
+    },
+    modalInputLabel: {
+        fontSize: 14,
+        color: '#333',
+        marginBottom: 5,
+        marginTop: 10,
+    },
+    modalInputValue: {
+        fontSize: 16,
+        color: '#007bff',
+        fontWeight: '500',
+        marginBottom: 10,
+    },
+    modalInput: {
+        borderWidth: 1,
+        borderColor: '#ccc',
+        borderRadius: 8,
+        padding: 10,
+        fontSize: 16,
+        marginBottom: 15,
+        backgroundColor: '#fff',
+    },
+    // Styles for movimiento detail buttons
+    movimientoDetailButton: {
+        backgroundColor: '#0a57d9',
+        borderRadius: 8,
+        padding: 12,
+        alignItems: 'center',
+        marginTop: 10,
+    },
+    movimientoDetailButtonText: {
+        color: '#fff',
+        fontWeight: '600',
+    },
+    // Styles for delete confirmation in movimiento detail modal
+    deleteConfirmationContainer: {
+        backgroundColor: '#f8d7da',
+        borderRadius: 8,
+        padding: 15,
+        marginTop: 10,
+    },
+    deleteConfirmationText: {
+        color: '#721c24',
+        fontSize: 14,
+        marginBottom: 10,
+    },
+    deleteConfirmationButton: {
+        backgroundColor: '#d9534f',
+        borderRadius: 8,
+        padding: 12,
+        alignItems: 'center',
+    },
+    deleteConfirmationButtonText: {
+        color: '#fff',
+        fontWeight: '600',
+    },
+    // Styles for close button in modals
+    closeButton: {
+        position: 'absolute',
+        top: 10,
+        right: 10,
+        padding: 8,
+        borderRadius: 20,
+        backgroundColor: '#f2f2f2',
+    },
+    closeButtonText: {
+        fontSize: 16,
+        fontWeight: '500',
+        color: '#333',
+    },
+    // General modal styles
+    modalOverlay: {
+        flex: 1,
+        justifyContent: 'center',
+        alignItems: 'center',
+        backgroundColor: 'rgba(0, 0, 0, 0.7)',
+    },
+    modalContainer: {
+        width: '90%',
+        backgroundColor: '#fff',
+        borderRadius: 10,
+        padding: 20,
+        elevation: 5,
+        shadowColor: '#000',
+        shadowOpacity: 0.1,
+        shadowOffset: { width: 0, height: 2 },
+        shadowRadius: 4,
+    },
+    modalTitle: {
+        fontSize: 18,
+        fontWeight: '600',
+        color: '#0a57d9',
+        marginBottom: 15,
+    },
+    modalSubtitle: {
+        fontSize: 14,
+        color: '#666',
+        marginBottom: 20,
+    },
+    modalButton: {
+        backgroundColor: '#0a57d9',
+        borderRadius: 8,
+        padding: 12,
+        alignItems: 'center',
+        marginTop: 15,
     },
     modalButtonText: {
         color: '#fff',
         fontWeight: '600',
     },
-    confirmContainer: {
-        width: '85%',
-        paddingTop: 10,
-        paddingBottom: 20,
+    // Specific styles for movimiento detail modal
+    movimientoDetailContainer: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        paddingVertical: 10,
     },
-
-
+    movimientoDetailLabel: {
+        fontSize: 14,
+        color: '#333',
+        fontWeight: '500',
+    },
+    movimientoDetailValue: {
+        fontSize: 14,
+        color: '#007bff',
+        fontWeight: '600',
+    },
+    movimientoActionsContainer: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        marginTop: 15,
+    },
+    movimientoActionButton: {
+        flex: 1,
+        marginHorizontal: 5,
+    },
+    movimientoActionText: {
+        textAlign: 'center',
+        fontWeight: '500',
+    },
+    movimientoDeleteButton: {
+        backgroundColor: '#d9534f',
+    },
+    movimientoEditButton: {
+        backgroundColor: '#007bff',
+    },
+    movimientoSaveButton: {
+        backgroundColor: '#28a745',
+    },
+    movimientoCancelButton: {
+        backgroundColor: '#6c757d',
+    },
+    movimientoFormGroup: {
+        width: '100%',
+        marginTop: 10,
+    },
+    movimientoFormLabel: {
+        fontSize: 14,
+        color: '#333',
+        marginBottom: 5,
+    },
+    movimientoFormInput: {
+        width: '100%',
+        borderWidth: 1,
+        borderColor: '#ddd',
+        borderRadius: 8,
+        padding: 10,
+        fontSize: 14,
+    },
+    movimientoFormButton: {
+        backgroundColor: '#0a57d9',
+        borderRadius: 8,
+        padding: 12,
+        alignItems: 'center',
+        marginTop: 15,
+    },
+    movimientoFormButtonText: {
+        color: '#fff',
+        fontWeight: '600',
+    },
+    movimientoDeleteConfirmation: {
+        backgroundColor: '#f8d7da',
+        borderRadius: 8,
+        padding: 15,
+        marginTop: 10,
+    },
+    movimientoDeleteConfirmationText: {
+        color: '#721c24',
+        fontSize: 14,
+        marginBottom: 10,
+    },
+    movimientoDeleteConfirmationButton: {
+        backgroundColor: '#d9534f',
+        borderRadius: 8,
+        padding: 12,
+        alignItems: 'center',
+    },
+    movimientoDeleteConfirmationButtonText: {
+        color: '#fff',
+        fontWeight: '600',
+    },
+    modalInfoSection: {
+        width: '100%',
+        marginVertical: 15,
+    },
+    orderOption: {
+        width: '100%',
+        padding: 15,
+        borderBottomWidth: 1,
+        borderBottomColor: '#eee',
+        backgroundColor: '#f9f9f9',
+        marginVertical: 2,
+        borderRadius: 8,
+    },
+    orderOptionText: {
+        fontSize: 14,
+        color: '#333',
+        fontWeight: '500',
+    },
 });
