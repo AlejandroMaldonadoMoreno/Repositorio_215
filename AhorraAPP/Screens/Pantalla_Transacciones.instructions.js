@@ -1,7 +1,33 @@
-import React from "react";
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView } from "react-native";
+import React, { useState } from "react";
+import { View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView, Platform } from "react-native";
+import DateTimePicker from '@react-native-community/datetimepicker';
 
 export default function Pantalla_Transacciones() {
+  const [dateTransaccion, setDateTransaccion] = useState(new Date());
+  const [showDateTransaccion, setShowDateTransaccion] = useState(false);
+  const [dateServicio, setDateServicio] = useState(new Date());
+  const [showDateServicio, setShowDateServicio] = useState(false);
+
+  const onChangeTransaccion = (event, selectedDate) => {
+    const currentDate = selectedDate || dateTransaccion;
+    setShowDateTransaccion(Platform.OS === 'ios');
+    setDateTransaccion(currentDate);
+  };
+
+  const onChangeServicio = (event, selectedDate) => {
+    const currentDate = selectedDate || dateServicio;
+    setShowDateServicio(Platform.OS === 'ios');
+    setDateServicio(currentDate);
+  };
+
+  const formatDate = (d) => {
+    if(!d) return '';
+    const day = String(d.getDate()).padStart(2,'0');
+    const month = String(d.getMonth()+1).padStart(2,'0');
+    const year = d.getFullYear();
+    return `${day}/${month}/${year}`;
+  };
+
   return (
     <ScrollView contentContainerStyle={styles.container}>
       {/* Fondo azul superior */}
@@ -42,7 +68,17 @@ export default function Pantalla_Transacciones() {
           </View>
 
           <Text style={styles.label}>Fecha:</Text>
-          <TextInput style={styles.input} placeholder="DD/MM/AAAA" placeholderTextColor="#aaa" />
+          <TouchableOpacity style={styles.dateInput} onPress={() => setShowDateTransaccion(true)}>
+            <Text style={{ color: dateTransaccion ? '#000' : '#aaa' }}>{dateTransaccion ? formatDate(dateTransaccion) : 'DD/MM/AAAA'}</Text>
+          </TouchableOpacity>
+          {showDateTransaccion && (
+            <DateTimePicker
+              value={dateTransaccion}
+              mode="date"
+              display={Platform.OS === 'ios' ? 'spinner' : 'calendar'}
+              onChange={onChangeTransaccion}
+            />
+          )}
 
           <TouchableOpacity style={styles.boton}>
             <Text style={styles.textoBoton}>Realizar</Text>
@@ -76,7 +112,17 @@ export default function Pantalla_Transacciones() {
           </View>
 
           <Text style={styles.label}>Fecha:</Text>
-          <TextInput style={styles.input} placeholder="DD/MM/AAAA" placeholderTextColor="#aaa" />
+          <TouchableOpacity style={styles.dateInput} onPress={() => setShowDateServicio(true)}>
+            <Text style={{ color: dateServicio ? '#000' : '#aaa' }}>{dateServicio ? formatDate(dateServicio) : 'DD/MM/AAAA'}</Text>
+          </TouchableOpacity>
+          {showDateServicio && (
+            <DateTimePicker
+              value={dateServicio}
+              mode="date"
+              display={Platform.OS === 'ios' ? 'spinner' : 'calendar'}
+              onChange={onChangeServicio}
+            />
+          )}
 
           <TouchableOpacity style={styles.boton}>
             <Text style={styles.textoBoton}>Realizar</Text>
@@ -171,6 +217,15 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     padding: 8,
     fontSize: 14,
+  },
+
+  dateInput: {
+    borderWidth: 1,
+    borderColor: "#ccc",
+    borderRadius: 8,
+    padding: 8,
+    fontSize: 14,
+    justifyContent: 'center',
   },
   fila: {
     flexDirection: "row",

@@ -6,6 +6,7 @@ npm install react-native-gesture-handler
 npm install react-native-reanimated
 npm install react-native-screens
 npm install react-native-safe-area-context
+npm install @react-native-community/datetimepicker
 
 npm audit fix
 

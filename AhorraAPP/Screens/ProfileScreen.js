@@ -1,14 +1,20 @@
 import React, { useState } from "react";
 import {
-    View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView, SafeAreaView, Switch
+    View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView, SafeAreaView, Switch, Modal, Pressable
 } from "react-native";
 
-export default function ProfileScreen() {
+export default function ProfileScreen({ navigation }) {
   const [nombre, setNombre] = useState("");
   const [celular, setCelular] = useState("");
   const [correo, setCorreo] = useState("");
   const [password, setPassword] = useState("");
   const [alertas, setAlertas] = useState(false);
+  const [isModalVisible, setIsModalVisible] = useState(false);
+
+  const handleSave = () => {
+    // aquí podrías enviar datos al servidor o guardarlos en un store
+    setIsModalVisible(false);
+  };
 
   return (
     <SafeAreaView style={styles.contenedor}>
@@ -16,7 +22,9 @@ export default function ProfileScreen() {
         {/* Header grande (recuadro azul) */}
         <View style={styles.recuadroAzul}>
           <View style={styles.barraSuperior}>
-            <Text style={styles.botonVolver}>{"< Back"}</Text>
+            <Pressable onPress={() => navigation.goBack()}>
+              <Text style={styles.botonVolver}>{"< Atrás"}</Text>
+            </Pressable>
           </View>
           <Text style={styles.recuadroAzulText}>Ahorra+ App</Text>
         </View>
@@ -36,62 +44,21 @@ export default function ProfileScreen() {
           </View>
         </View>
 
-        <View style={styles.tarjetaFormulario}>
-          <Text style={styles.tituloFormulario}>Actualiza tu información</Text>
+        {/* Pantalla principal del perfil: información y botón para abrir actualización */}
+        <View style={[styles.tarjetaFormulario, { alignItems: 'flex-start' }]}>
+          <Text style={styles.tituloFormulario}>Mi Cuenta</Text>
 
-          <Text style={styles.etiqueta}>Nombre del usuario</Text>
-          <TextInput
-            style={styles.campo}
-            placeholder="Ingresa tu nombre"
-            placeholderTextColor="#999"
-            value={nombre}
-            onChangeText={setNombre}
-          />
+          <Text style={styles.etiqueta}>Nombre</Text>
+          <Text style={{ marginBottom: 10 }}>{nombre || 'No proporcionado'}</Text>
 
-          <Text style={styles.etiqueta}>Número Celular</Text>
-          <TextInput
-            style={styles.campo}
-            placeholder="Ingresa tu número"
-            placeholderTextColor="#999"
-            keyboardType="phone-pad"
-            value={celular}
-            onChangeText={setCelular}
-          />
+          <Text style={styles.etiqueta}>Celular</Text>
+          <Text style={{ marginBottom: 10 }}>{celular || 'No proporcionado'}</Text>
 
-          <Text style={styles.etiqueta}>Correo electrónico</Text>
-          <TextInput
-            style={styles.campo}
-            placeholder="correo@ejemplo.com"
-            placeholderTextColor="#999"
-            keyboardType="email-address"
-            value={correo}
-            onChangeText={setCorreo}
-          />
+          <Text style={styles.etiqueta}>Correo</Text>
+          <Text style={{ marginBottom: 10 }}>{correo || 'No proporcionado'}</Text>
 
-          <Text style={styles.etiqueta}>Nueva contraseña</Text>
-          <TextInput
-            style={styles.campo}
-            placeholder="••••••••"
-            placeholderTextColor="#999"
-            secureTextEntry
-            value={password}
-            onChangeText={setPassword}
-          />
-
-          <View style={styles.switchContainer}>
-            <Text style={styles.switchLabel}>
-              Enviar alertas de presupuesto a mi correo
-            </Text>
-            <Switch
-              value={alertas}
-              onValueChange={setAlertas}
-              trackColor={{ false: '#d1d5db', true: "#002359", }}
-              thumbColor={alertas ? '#ffffff' : '#f4f3f4'}
-            />
-          </View>
-
-          <TouchableOpacity style={styles.boton}>
-            <Text style={styles.textoBoton}>Actualizar</Text>
+          <TouchableOpacity style={[styles.boton, { alignSelf: 'stretch' }]} onPress={() => setIsModalVisible(true)}>
+            <Text style={styles.textoBoton}>Actualizar información</Text>
           </TouchableOpacity>
         </View>
 
@@ -100,6 +67,83 @@ export default function ProfileScreen() {
             Ahorra+ • Seguridad en tus finanzas
           </Text>
         </View>
+
+        {/* Modal secundario para actualizar información */}
+        <Modal
+          visible={isModalVisible}
+          animationType="slide"
+          transparent={true}
+          onRequestClose={() => setIsModalVisible(false)}
+        >
+          <View style={styles.modalOverlay}>
+            <View style={styles.modalContent}>
+              <View style={styles.modalHeader}>
+                <Text style={styles.tituloFormulario}>Actualizar información</Text>
+                <Pressable onPress={() => setIsModalVisible(false)}>
+                  <Text style={{ color: '#0a57d9', fontWeight: '700' }}>Cerrar</Text>
+                </Pressable>
+              </View>
+
+              <ScrollView contentContainerStyle={{ paddingBottom: 20 }}>
+                <Text style={styles.etiqueta}>Nombre del usuario</Text>
+                <TextInput
+                  style={styles.campo}
+                  placeholder="Ingresa tu nombre"
+                  placeholderTextColor="#999"
+                  value={nombre}
+                  onChangeText={setNombre}
+                />
+
+                <Text style={styles.etiqueta}>Número Celular</Text>
+                <TextInput
+                  style={styles.campo}
+                  placeholder="Ingresa tu número"
+                  placeholderTextColor="#999"
+                  keyboardType="phone-pad"
+                  value={celular}
+                  onChangeText={setCelular}
+                />
+
+                <Text style={styles.etiqueta}>Correo electrónico</Text>
+                <TextInput
+                  style={styles.campo}
+                  placeholder="correo@ejemplo.com"
+                  placeholderTextColor="#999"
+                  keyboardType="email-address"
+                  value={correo}
+                  onChangeText={setCorreo}
+                />
+
+                <Text style={styles.etiqueta}>Nueva contraseña</Text>
+                <TextInput
+                  style={styles.campo}
+                  placeholder="••••••••"
+                  placeholderTextColor="#999"
+                  secureTextEntry
+                  value={password}
+                  onChangeText={setPassword}
+                />
+
+                <View style={styles.switchContainer}>
+                  <Text style={styles.switchLabel}>
+                    Enviar alertas de presupuesto a mi correo
+                  </Text>
+                  <Switch
+                    value={alertas}
+                    onValueChange={setAlertas}
+                    trackColor={{ false: '#d1d5db', true: "#0a57d9", }}
+                    thumbColor={alertas ? '#ffffff' : '#f4f3f4'}
+                  />
+                </View>
+
+                <TouchableOpacity style={styles.boton} onPress={handleSave}>
+                  <Text style={styles.textoBoton}>Guardar cambios</Text>
+                </TouchableOpacity>
+              </ScrollView>
+            </View>
+          </View>
+        </Modal>
+
       </ScrollView>
     </SafeAreaView>
   );
@@ -116,7 +160,7 @@ const styles = StyleSheet.create({
   },
   
   botonVolver: {
-    color: "#002359",
+    color: "#0a57d9",
     fontSize: 16,
   },
   tituloApp: {
@@ -130,11 +174,11 @@ const styles = StyleSheet.create({
   recuadroAzul: {
     width: "100%",
     height: 160,
-    backgroundColor: "#072A63",
+    backgroundColor: "#002359",
     borderBottomLeftRadius: 20,
     borderBottomRightRadius: 20,
-    paddingTop: 18,
-    paddingHorizontal: 16,
+    paddingTop: 30,
+    paddingHorizontal: 20,
     alignItems: "center",
     justifyContent: "flex-start",
     shadowColor: "#000",
@@ -181,7 +225,7 @@ const styles = StyleSheet.create({
   },
   avatarInicial: {
     fontSize: 36,
-    color: "#002359",
+    color: "#0a57d9",
     fontWeight: "bold",
   },
   nombrePerfil: {
@@ -210,7 +254,7 @@ const styles = StyleSheet.create({
   tituloFormulario: {
     fontSize: 16,
     fontWeight: "bold",
-    color: "#003366",
+    color: "#0a57d9",
     marginBottom: 15,
   },
   etiqueta: {
@@ -228,7 +272,7 @@ const styles = StyleSheet.create({
     marginBottom: 15,
   },
   boton: {
-    backgroundColor: "#002359",
+    backgroundColor: "#0a57d9",
     borderRadius: 12,
     paddingVertical: 12,
     alignItems: "center",
@@ -263,5 +307,25 @@ const styles = StyleSheet.create({
     color: '#4b5563',
     fontSize: 13,
     flexShrink: 1,
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.4)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  modalContent: {
+    width: '100%',
+    maxHeight: '90%',
+    backgroundColor: '#fff',
+    borderRadius: 16,
+    padding: 16,
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 8,
   },
 });

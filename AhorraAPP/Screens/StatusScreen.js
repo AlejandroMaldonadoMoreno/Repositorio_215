@@ -4,8 +4,7 @@ import React, { useState } from 'react';
 import Pantalla_Transacciones from './Pantalla_Transacciones.instructions';
 
 
-export default function StatusScreen() {
-    const[screen, setScreen] = useState('status');
+export default function StatusScreen({ navigation }) {
 
     const [movimientos, setMovimientos] = useState([
         { id: 'm1', title: 'Movimento 1', tag: 'Pagaste - concepto: Pago del auto', amount: '$ 25,000.75', date: '14 de noviembre de 2025', time: '10:30' },
@@ -164,18 +163,17 @@ export default function StatusScreen() {
         return arr;
     };
 
-    switch (screen) {
-        case 'transacciones':
-            return <Pantalla_Transacciones/>;
-        case 'status':
-        
     return (
     <ScrollView
         contentContainerStyle={styles.containerMain}
         showsVerticalScrollIndicator={false}
         showsHorizontalScrollIndicator={false}
     >
-        <View style={styles.fondoAzul} />
+        <View style={styles.fondoAzul}>
+            <TouchableOpacity onPress={() => navigation.goBack()}>
+                <Text style={styles.Atras}>{"< Atrás"}</Text>
+            </TouchableOpacity>
+        </View>
         
             <View style={styles.contenido}>
                 <View style={styles.dataContainer}>
@@ -184,7 +182,7 @@ export default function StatusScreen() {
                     <Text style={styles.titleMoney}>$ 25,000.75</Text>
                     <TouchableOpacity 
                         style={styles.botonTransacciones}
-                        onPress={() => setScreen('transacciones')}
+                        onPress={() => navigation.navigate('Transacciones')}
 
                     >
                         <Text style={styles.tituloBoton}> Crear Transacción </Text>
@@ -564,7 +562,6 @@ export default function StatusScreen() {
   
   );
 }
-}
 
 //CAmbios
 const styles = StyleSheet.create({
@@ -588,7 +585,17 @@ const styles = StyleSheet.create({
         backgroundColor: "#002359",
         borderBottomLeftRadius: 40,
         borderBottomRightRadius: 40,
+
+        paddingTop: 30,
+        paddingLeft: 20,
+        
+          
     },
+    Atras: {
+        color: "#0a57d9",
+        fontSize: 16,
+    },
+    
     fondoInferior: {
         position: "absolute",
         bottom: 0,

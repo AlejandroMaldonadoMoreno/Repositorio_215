@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, StyleSheet, Platform, StatusBar, SafeAreaView } from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, StyleSheet, Platform, Modal, Pressable, FlatList } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 // --- IMPORTACIÓN DE GRÁFICO CIRCULAR ---
 import PieChart from 'react-native-pie-chart'; 
@@ -9,65 +9,52 @@ import PieChart from 'react-native-pie-chart';
   ... (Tus comentarios)
 */
 
-export default function GraficaScreen() {
+export default function GraficaScreen({ navigation }) {
     const [ruta, setRuta] = useState('principal'); 
     return ruta === 'principal' ? (
-        <Principal onVerDetalle={() => setRuta('detalle')} />
+        <Principal navigation={navigation} onVerDetalle={() => setRuta('detalle')} />
     ) : (
-        <Detalle onVolver={() => setRuta('principal')} />
+        <Detalle navigation={navigation} onVolver={() => setRuta('principal')} />
     );
 }
 
-// --- Header ---
-const TOP_INSET = Platform.OS === 'android' ? (StatusBar.currentHeight || 0) : (Platform.OS === 'ios' ? 44 : 0);
-
-function Header({ onBack }) {
-    return (
-        <View style={[styles.headerWrap, { paddingTop: TOP_INSET, minHeight: 80 + TOP_INSET }] }>
-            <View style={styles.headerRow}>
-                {onBack ? (
-                    <TouchableOpacity onPress={onBack} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
-                        <Text style={styles.headerBack}>Back</Text>
-                    </TouchableOpacity>
-                ) : (
-                    <View style={{ width: 50 }} />
-                )}
-                <Text style={styles.headerTitle}>ahorra + app</Text>
-                <View style={{ width: 50 }} />
-            </View>
-        </View>
-    );
-}
+// Header removed — we inline the header markup where needed so containers can overlap it.
 
 // --- Vista Principal ---
-function Principal({ onVerDetalle }) {
+function Principal({ onVerDetalle, navigation }) {
+    const [notifVisible, setNotifVisible] = useState(false);
+    const [notifications] = useState([
+        { id: 'n1', title: 'Pago recibido', body: 'Has recibido $1,200.00', time: 'Hoy 10:30' },
+        { id: 'n2', title: 'Alerta presupuesto', body: 'Estás cerca de tu límite en Comida', time: 'Ayer 18:12' },
+        { id: 'n3', title: 'Recordatorio', body: 'Paga tu servicio de agua', time: 'Hace 2 días' },
+    ]);
+
     return (
-        <View style={{ flex: 1, backgroundColor: palette.bg }}>
-            
-            <View style={{ backgroundColor: palette.header }}>
-                <SafeAreaView style={{ backgroundColor: palette.header }} /> 
-                <StatusBar barStyle="light-content" backgroundColor={palette.header} />
-                <Header />
-            </View>
-            
+        <View style={[styles.container, { backgroundColor: palette.bg }] }>
+            {/* Header removed — main content starts here */}
+            <View style={styles.fondoAzul} />
+
             <ScrollView style={{ flex: 1 }} contentContainerStyle={{ padding: 16 }}>
 
-                <View style={[styles.cardBalance, { marginTop: -24 }] }>
+                <View style={[styles.cardBalance]}>
                     <Text style={styles.small}>Saldo Disponible</Text>
                     <Text style={styles.balance}>$ 23403.74</Text>
 
                     <View style={styles.rowBetween}>
-                        <TouchableOpacity style={styles.ctaButton} activeOpacity={0.8}>
+                        <TouchableOpacity style={styles.ctaButton} 
+                            activeOpacity={0.8}
+                            onPress={() => navigation.navigate('Profile')}
+                        >
                             <Text style={styles.ctaText}>Mi Cuenta</Text>
                         </TouchableOpacity>
                         
-                        <View style={styles.circleIcon}>
+                        <TouchableOpacity style={styles.circleIcon} onPress={() => setNotifVisible(true)}>
                             <Ionicons
-                                name="settings-sharp"
+                                name="mail"
                                 size={metrics.circle * 0.6}
                                 color={palette.primary}
                             />
-                        </View>
+                        </TouchableOpacity>
                     </View>
                 </View>
 
@@ -124,7 +111,11 @@ function Principal({ onVerDetalle }) {
                 <View style={styles.sectionCard}>
                     <View style={styles.sectionHeaderRow}>
                         <Text style={styles.sectionTitle}>Movimientos Recientes</Text>
-                        <TouchableOpacity><Text style={styles.link}>Ver Todo...</Text></TouchableOpacity>
+                        <TouchableOpacity
+                            onPress={() => navigation.navigate('Status')}
+                        >
+                            <Text style={styles.link}>Ver Todo...</Text>
+                        </TouchableOpacity>
                     </View>
 
                     {/* Items */}
@@ -147,6 +138,32 @@ function Principal({ onVerDetalle }) {
                     </View>
                 </View>
             </ScrollView>
+            <Modal visible={notifVisible} animationType="fade" transparent onRequestClose={() => setNotifVisible(false)}>
+                <View style={styles.modalOverlay}>
+                    <View style={styles.modalBox}>
+                        <View style={styles.modalHeaderRow}>
+                            <Text style={styles.modalTitle}>Notificaciones</Text>
+                            <Pressable onPress={() => setNotifVisible(false)} style={styles.closeButton}>
+                                <Text style={styles.closeButtonText}>Cerrar</Text>
+                            </Pressable>
+                        </View>
+
+                        <FlatList
+                            data={notifications}
+                            keyExtractor={item => item.id}
+                            renderItem={({ item }) => (
+                                <View style={styles.notifItem}>
+                                    <Text style={styles.notifTitle}>{item.title}</Text>
+                                    <Text style={styles.notifBody}>{item.body}</Text>
+                                    <Text style={styles.notifTime}>{item.time}</Text>
+                                </View>
+                            )}
+                        />
+                    </View>
+                </View>
+            </Modal>
+
+            <View style={styles.fondoInferior} />
         </View>
     );
 }
@@ -162,15 +179,14 @@ function Detalle({ onVolver }) {
     ];
 
     return (
-        <View style={{ flex: 1, backgroundColor: palette.bg }}>
-            <View style={{ backgroundColor: palette.header }}>
-                <SafeAreaView style={{ backgroundColor: palette.header }} /> 
-                <StatusBar barStyle="light-content" backgroundColor={palette.header} />
-                <Header onBack={onVolver} />
-            </View>
+        <View style={[styles.container, { backgroundColor: palette.bg }] }>
+            <View style={styles.fondoAzul} />
+            <View style={styles.fondoInferior} />
+
+            {/* Header removed — main content starts here for Detalle */}
 
             <ScrollView style={{ flex: 1 }} contentContainerStyle={{ padding: 16 }}>
-                <View style={styles.cardBalance}>
+                <View style={[styles.cardBalance]}>
                     <Text style={styles.small}>Saldo Disponible</Text>
                     <Text style={styles.balance}>$ 23403.74</Text>
                 </View>
@@ -236,22 +252,8 @@ const metrics = {
 };
 
 const styles = StyleSheet.create({
-    container: { flex: 1, backgroundColor: palette.bg }, 
-    headerWrap: {
-        backgroundColor: palette.header,
-        borderBottomLeftRadius: metrics.rHeader,
-        borderBottomRightRadius: metrics.rHeader,
-        paddingBottom: 8,
-    },
-    headerRow: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        paddingHorizontal: 12,
-        minHeight: metrics.headerMinH,
-    },
-    headerBack: { color: palette.primary, fontWeight: '600' },
-    headerTitle: { color: '#fff', fontSize: 16, fontWeight: '700', textAlign: 'center' },
+    container: { flex: 1, position: 'relative' }, 
+    // header styles removed
     cardBalance: {
         backgroundColor: palette.card,
         borderRadius: metrics.r,
@@ -259,6 +261,27 @@ const styles = StyleSheet.create({
         elevation: 3,
         shadowColor: '#000',
         shadowOpacity: 0.08,
+        marginTop: Platform.OS === 'android' ? 60 : 80,
+    },
+     fondoAzul: {
+        position: "absolute",
+        top: 0,
+        left: 0,
+        width: "100%",
+        height: 250,
+        backgroundColor: "#002359",
+        borderBottomLeftRadius: 40,
+        borderBottomRightRadius: 40,
+    },
+    fondoInferior: {
+        position: "absolute",
+        bottom: 0,
+        left: 0,
+        width: "100%",
+        height: 60,
+        backgroundColor: "#002359",
+        borderTopLeftRadius: 40,
+        borderTopRightRadius: 40,
     },
     small: { color: palette.textMuted, fontSize: 14 },
     balance: { fontSize: 28, fontWeight: '700', marginTop: 6 },
@@ -318,5 +341,56 @@ const styles = StyleSheet.create({
     movDate: { color: '#999', fontSize: 12 },
     movAmount: { fontWeight: '700' },
     
-    // (Ya no necesitamos el estilo 'piePlaceholder')
+    // Notification modal styles
+    modalOverlay: {
+        flex: 1,
+        backgroundColor: 'rgba(0,0,0,0.5)',
+        justifyContent: 'center',
+        alignItems: 'center',
+        padding: 20,
+    },
+    modalBox: {
+        width: '100%',
+        maxHeight: '80%',
+        backgroundColor: '#fff',
+        borderRadius: 12,
+        padding: 16,
+    },
+    modalHeaderRow: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        marginBottom: 12,
+    },
+    modalTitle: {
+        fontSize: 18,
+        fontWeight: '700',
+    },
+    closeButton: {
+        paddingHorizontal: 12,
+        paddingVertical: 6,
+    },
+    closeButtonText: {
+        color: palette.primary,
+        fontWeight: '700',
+    },
+    notifItem: {
+        paddingVertical: 12,
+        borderBottomWidth: 1,
+        borderBottomColor: '#eee',
+    },
+    notifTitle: {
+        fontWeight: '700',
+        marginBottom: 4,
+    },
+    notifBody: {
+        color: '#444',
+        marginBottom: 6,
+    },
+    notifTime: {
+        color: '#888',
+        fontSize: 12,
+    },
+
+    // footer/background styles removed
 });

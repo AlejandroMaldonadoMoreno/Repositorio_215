@@ -1,7 +1,7 @@
 import React, {useState} from 'react';
 import { View, Text, StyleSheet, Modal, Pressable, TextInput, Switch, Alert} from 'react-native';
 
-export default function LoginScreen() {
+export default function LoginScreen({ navigation }) {
     const [modalVisible, setModalVisible] = useState(null);
     const [alertas, setAlertas] = useState(false);
     const [nombre, setNombre] = useState('');
@@ -23,6 +23,7 @@ export default function LoginScreen() {
         Alert.alert('Inicio de sesión exitoso', 'Bienvenido de nuevo!');
         setCorreo(''); 
         setContrasenia('');
+        navigation.navigate('Grafica');
         return true;
     }
     const validacionRegistro=()=>{
