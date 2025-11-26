@@ -2,11 +2,9 @@ import React, { useState } from "react";
 import { View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView, Platform } from "react-native";
 import DateTimePicker from '@react-native-community/datetimepicker';
 
-export default function Pantalla_Transacciones() {
+export default function Pantalla_Transacciones({ navigation }) {
   const [dateTransaccion, setDateTransaccion] = useState(new Date());
   const [showDateTransaccion, setShowDateTransaccion] = useState(false);
-  const [dateServicio, setDateServicio] = useState(new Date());
-  const [showDateServicio, setShowDateServicio] = useState(false);
 
   const onChangeTransaccion = (event, selectedDate) => {
     const currentDate = selectedDate || dateTransaccion;
@@ -14,11 +12,6 @@ export default function Pantalla_Transacciones() {
     setDateTransaccion(currentDate);
   };
 
-  const onChangeServicio = (event, selectedDate) => {
-    const currentDate = selectedDate || dateServicio;
-    setShowDateServicio(Platform.OS === 'ios');
-    setDateServicio(currentDate);
-  };
 
   const formatDate = (d) => {
     if(!d) return '';
@@ -31,7 +24,11 @@ export default function Pantalla_Transacciones() {
   return (
     <ScrollView contentContainerStyle={styles.container}>
       {/* Fondo azul superior */}
-      <View style={styles.fondoAzul} />
+      <View style={styles.fondoAzul}>
+        <TouchableOpacity onPress={() => navigation.goBack()}>
+                <Text style={styles.Atras}>{"< Atrás"}</Text>
+            </TouchableOpacity>
+      </View>
 
       {/* Contenido principal */}
       <View style={styles.contenido}>
@@ -83,51 +80,7 @@ export default function Pantalla_Transacciones() {
           <TouchableOpacity style={styles.boton}>
             <Text style={styles.textoBoton}>Realizar</Text>
           </TouchableOpacity>
-        </View>
-
-        {/* Formulario 2 - Pagar servicio */}
-        <View style={styles.formulario}>
-          <Text style={styles.tituloSeccion}>Pagar Servicio</Text>
-
-          <Text style={styles.label}>Nombre del servicio:</Text>
-          <TextInput style={styles.input} placeholder="Ej. Luz" placeholderTextColor="#aaa" />
-
-          <Text style={styles.label}>Clave del servicio:</Text>
-          <TextInput
-            style={styles.input}
-            keyboardType="numeric"
-            placeholder="Ej. 847392"
-            placeholderTextColor="#aaa"
-          />
-
-          <View style={styles.fila}>
-            <View style={{ flex: 1, marginRight: 5 }}>
-              <Text style={styles.label}>Monto:</Text>
-              <TextInput style={styles.input} placeholder="Ej. 350.00" placeholderTextColor="#aaa" />
-            </View>
-            <View style={{ flex: 1, marginLeft: 5 }}>
-              <Text style={styles.label}>Categoría:</Text>
-              <TextInput style={styles.input} placeholder="Ej. Hogar" placeholderTextColor="#aaa" />
-            </View>
-          </View>
-
-          <Text style={styles.label}>Fecha:</Text>
-          <TouchableOpacity style={styles.dateInput} onPress={() => setShowDateServicio(true)}>
-            <Text style={{ color: dateServicio ? '#000' : '#aaa' }}>{dateServicio ? formatDate(dateServicio) : 'DD/MM/AAAA'}</Text>
-          </TouchableOpacity>
-          {showDateServicio && (
-            <DateTimePicker
-              value={dateServicio}
-              mode="date"
-              display={Platform.OS === 'ios' ? 'spinner' : 'calendar'}
-              onChange={onChangeServicio}
-            />
-          )}
-
-          <TouchableOpacity style={styles.boton}>
-            <Text style={styles.textoBoton}>Realizar</Text>
-          </TouchableOpacity>
-        </View>
+        </View>     
       </View>
 
       {/* Fondo azul inferior */}
@@ -144,15 +97,22 @@ const styles = StyleSheet.create({
     paddingBottom: 40,
   },
   fondoAzul: {
-    position: "absolute",
-    top: 0,
-    left: 0,
-    width: "100%",
-    height: 250,
-    backgroundColor: "#002359",
-    borderBottomLeftRadius: 40,
-    borderBottomRightRadius: 40,
+       position: "absolute",
+        top: 0,
+        left: 0,
+        width: "100%",
+        height: 250,
+        backgroundColor: "#002359",
+        borderBottomLeftRadius: 40,
+        borderBottomRightRadius: 40,
+
+        paddingTop: 30,
+        paddingLeft: 20,         
   },
+  Atras: {
+        color: "#0a57d9",
+        fontSize: 16,
+    },
   fondoInferior: {
     position: "absolute",
     bottom: 0,

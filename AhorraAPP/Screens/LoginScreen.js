@@ -1,5 +1,8 @@
-import React, {useState} from 'react';
-import { View, Text, StyleSheet, Modal, Pressable, TextInput, Switch, Alert} from 'react-native';
+import React, {useState, useEffect} from 'react';
+import { View, Text, StyleSheet, Modal, Pressable, TextInput, Switch, Alert, KeyboardAvoidingView, Keyboard, TouchableWithoutFeedback, Platform, ScrollView } from 'react-native';
+import { UsuarioController } from '../controllers/UsuarioController';
+
+const usuarioController = new UsuarioController();
 
 export default function LoginScreen({ navigation }) {
     const [modalVisible, setModalVisible] = useState(null);
@@ -10,58 +13,93 @@ export default function LoginScreen({ navigation }) {
     const [correo, setCorreo] = useState('');
     const [contrasenia, setContrasenia] = useState('');
 
-    const validacionLogin=()=>{
-        if(correo.trim() === '' || contrasenia.trim() === ''){
-            Alert.alert("Error los campos estan en blanco (Móvil)");
+    useEffect(() => {
+        (async () => {
+            try {
+                await usuarioController.initialize();
+            } catch (e) {
+                console.warn('DB init error', e);
+            }
+        })();
+    }, []);
+
+    const validacionLogin = async () => {
+        if (correo.trim() === '' || contrasenia.trim() === '') {
+            Alert.alert('Error', 'Los campos están en blanco');
             return false;
         }
-        if(!correo.includes('@') || !correo.includes('.')){
-            Alert.alert("El correo no es valido (Móvil)");
+        if (!correo.includes('@') || !correo.includes('.')) {
+            Alert.alert('Error', 'El correo no es válido');
+            return false;
+        }
+        try {
+            const result = await usuarioController.checkCredentials(correo.trim().toLowerCase(), contrasenia);
+            if (result.status === 'not_found') {
+                Alert.alert('Error', 'El correo no está registrado');
+                return false;
+            }
+            if (result.status === 'wrong_password') {
+                Alert.alert('Error', 'La contraseña es incorrecta');
+                return false;
+            }
+            if (result.status === 'ok') {
+                const usuario = result.user;
+                Alert.alert('Inicio de sesión exitoso', `Bienvenido ${usuario.nombre}`);
+                setCorreo('');
+                setContrasenia('');
+                navigation.navigate('Grafica');
+                return true;
+            }
+            Alert.alert('Error', 'No se pudo iniciar sesión');
+            return false;
+        } catch (e) {
+            console.error('Login error', e);
+            Alert.alert('Error', 'No se pudo iniciar sesión');
+            return false;
+        }
+    };
+    const validacionRegistro = async () => {
+        if (nombre.trim() === '' || apellidos.trim() === '' || telefono.trim() === '' || correo.trim() === '' || contrasenia.trim() === '') {
+            Alert.alert('Error', 'Completa todos los campos');
+            return false;
+        }
+        if (!correo.includes('@') || !correo.includes('.')) {
+            Alert.alert('Error', 'El correo no es válido');
+            return false;
+        }
+        if (telefono.length < 7) {
+            Alert.alert('Error', 'El número de teléfono no es válido');
+            return false;
+        }
+        if (!alertas) {
+            Alert.alert('Error', 'Debe aceptar recibir alertas de presupuesto');
             return false;
         }
 
-        Alert.alert('Inicio de sesión exitoso', 'Bienvenido de nuevo!');
-        setCorreo(''); 
-        setContrasenia('');
-        navigation.navigate('Grafica');
-        return true;
-    }
-    const validacionRegistro=()=>{
-        if(nombre.trim() === '' && apellidos.trim() === '' && telefono.trim() === '' && correo.trim() === '' && contrasenia.trim() === '' && alertas === false){
-            Alert.alert("Error los campos estan en blanco");
-            return false;
-        }
-        if(!correo.includes('@') || !correo.includes('.')){
-            Alert.alert("El correo no es valido");
-            return false;
-        }
-        if(telefono.length < 12){
-            Alert.alert("El número de teléfono no es válido");
-            return false;
-        }
+        try {
+            const nuevo = await usuarioController.crearUsuario({
+                nombre,
+                apellidos,
+                telefono,
+                correo,
+                password: contrasenia,
+            });
 
-        if( nombre === ''){
-            Alert.alert("El número de teléfono no es válido");
+            Alert.alert('Registro exitoso', `Bienvenido ${nuevo.nombre}`);
+            setNombre('');
+            setApellidos('');
+            setTelefono('');
+            setCorreo('');
+            setContrasenia('');
+            setAlertas(false);
+            setModalVisible(null);
+            return true;
+        } catch (e) {
+            console.error('Registro error', e);
+            Alert.alert('Error', e.message || 'No se pudo registrar el usuario');
             return false;
         }
-        if ( apellidos === ''){
-            Alert.alert("El número de teléfono no es válido");
-            return false;
-        }
-        if(alertas === false){
-            Alert.alert("Debe aceptar recibir alertas de presupuesto");
-            return false;
-        }
-
-        Alert.alert('Registro exitoso', '¡Bienvenido a la aplicación de ahorro!');
-        setNombre('');
-        setApellidos('');
-        setTelefono('');
-        setCorreo('');
-        setContrasenia('');
-        setAlertas(false);
-        return true;
-    }
+    };
 
     const validacionRecuperar = () => {
         if (correo.trim() === '') {
@@ -97,64 +135,67 @@ export default function LoginScreen({ navigation }) {
             transparent={false}
             onRequestClose={() => setModalVisible(null)}
         >
-            <View style={styles.containerMain}>
+            <KeyboardAvoidingView style={styles.containerMain} behavior={Platform.OS === 'ios' ? 'padding' : 'height'} keyboardVerticalOffset={80}>
+                <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
+                    <ScrollView contentContainerStyle={{ flexGrow: 1 }} keyboardShouldPersistTaps="handled">
+                        <View style={styles.Encabezado}>
+                            <View style={styles.Salir}>
+                                <Pressable onPress={() => setModalVisible(null)}>
+                                    <Text style={styles.Atras}>‹ Atras</Text>
+                                </Pressable>
 
-                <View style={styles.Encabezado}>
-                    <View style={styles.Salir}>
-                        <Pressable onPress={() => setModalVisible(null)}>
-                            <Text style={styles.Atras}>‹ Atras</Text>
-                        </Pressable>
+                            </View>
 
-                    </View>
-
-                    <Text style={styles.Titulo}>Iniciar sesión</Text>
-                </View>
-
-
-                <View style={styles.Contain5}>
-                    <Text style={styles.label}>Correo electrónico:</Text>
-                    <TextInput
-                        style={styles.input}
-                        placeholder="Ejemplo@gmail.com"
-                        keyboardType="email-address"
-                        autoCapitalize="none"
-                        value={correo}
-                        onChangeText={setCorreo}
-                    />
-
-                    <Text style={styles.label}>Contraseña:</Text>
-                    <TextInput
-                        style={styles.input}
-                        placeholder="************"
-                        secureTextEntry
-                        value={contrasenia}
-                        onChangeText={setContrasenia}
-                    />
-
-                    <Pressable style={styles.BotonInicio}  onPress={() => { if (validacionLogin()) setModalVisible(null); }}>
-                        <Text style={styles.BotonInicioText}>Iniciar sesión</Text>
-                    </Pressable>
+                            <Text style={styles.Titulo}>Iniciar sesión</Text>
+                        </View>
 
 
-                </View>
+                        <View style={styles.Contain5}>
+                            <Text style={styles.label}>Correo electrónico:</Text>
+                            <TextInput
+                                style={styles.input}
+                                placeholder="Ejemplo@gmail.com"
+                                keyboardType="email-address"
+                                autoCapitalize="none"
+                                value={correo}
+                                onChangeText={setCorreo}
+                            />
+
+                            <Text style={styles.label}>Contraseña:</Text>
+                            <TextInput
+                                style={styles.input}
+                                placeholder="************"
+                                secureTextEntry
+                                value={contrasenia}
+                                onChangeText={setContrasenia}
+                            />
+
+                            <Pressable style={styles.BotonInicio}  onPress={async () => { const ok = await validacionLogin(); if (ok) setModalVisible(null); }}>
+                                <Text style={styles.BotonInicioText}>Iniciar sesión</Text>
+                            </Pressable>
 
 
-                <View style={styles.Card2}>
-                    <Text style={styles.CardText2}> ¿Aún no tienes cuenta? </Text>
-                    <Pressable onPress={() => setModalVisible('registro') }>
-                        <Text style={styles.BotonRegistro}> Regístrate</Text>
-                    </Pressable>
-                </View>
+                        </View>
 
-                <View style={styles.card3}>
-                    <Text style={styles.CardText3}> ¿Perdiste tu contraseña? </Text>
-                </View>
-                <View style={styles.contenedorBotonContra}>
-                    <Pressable style={styles.botonContra} onPress={() => setModalVisible('Recuperar') }>
-                        <Text style={styles.TextContra}> Recuperala aquí</Text>
-                    </Pressable>
-                </View>
-            </View>
+
+                        <View style={styles.Card2}>
+                            <Text style={styles.CardText2}> ¿Aún no tienes cuenta? </Text>
+                            <Pressable onPress={() => setModalVisible('registro') }>
+                                <Text style={styles.BotonRegistro}> Regístrate</Text>
+                            </Pressable>
+                        </View>
+
+                        <View style={styles.card3}>
+                            <Text style={styles.CardText3}> ¿Perdiste tu contraseña? </Text>
+                        </View>
+                        <View style={styles.contenedorBotonContra}>
+                            <Pressable style={styles.botonContra} onPress={() => setModalVisible('Recuperar') }>
+                                <Text style={styles.TextContra}> Recuperala aquí</Text>
+                            </Pressable>
+                        </View>
+                    </ScrollView>
+                </TouchableWithoutFeedback>
+            </KeyboardAvoidingView>
         </Modal>
 
         <Modal
@@ -163,89 +204,89 @@ export default function LoginScreen({ navigation }) {
             transparent={false}
             onRequestClose={() => setModalVisible(null)}
         >
-            <View style={styles.containerMain}>
+            <KeyboardAvoidingView style={styles.containerMain} behavior={Platform.OS === 'ios' ? 'padding' : 'height'} keyboardVerticalOffset={80}>
+                <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
+                    <ScrollView contentContainerStyle={{ flexGrow: 1 }} keyboardShouldPersistTaps="handled">
+                        <View style={styles.Encabezado2}>
+                            <View style={styles.Salir}>
+                                <Pressable onPress={() => setModalVisible(null)}>
+                                    <Text style={styles.Atras}>‹ Atras</Text>
+                                </Pressable>
 
-                <View style={styles.Encabezado2}>
-                    <View style={styles.Salir}>
-                        <Pressable onPress={() => setModalVisible(null)}>
-                            <Text style={styles.Atras}>‹ Atras</Text>
-                        </Pressable>
+                            </View>
 
-                    </View>
-
-                    <Text style={styles.Titulo}>Registro</Text>
-                </View>
-
-
-                <View style={styles.Contain6}>
-                    <Text style={styles.label}>Nombre:</Text>
-                    <TextInput
-                        style={styles.input}
-                        placeholder="Escribe tu nombre"
-                        keyboardType="default"
-                        autoCapitalize="words"
-                        value={nombre}
-                        onChangeText={setNombre}
-                    />
-                    <Text style={styles.label}>Apellidos:</Text>
-                    <TextInput
-                        style={styles.input}
-                        placeholder="Escribe tus apellidos"
-                        keyboardType="default"
-                        autoCapitalize="words"
-                        value={apellidos}
-                        onChangeText={setApellidos}
-                    />
-                    <Text style={styles.label}>Número de teléfono:</Text>
-                    <TextInput
-                        style={styles.input}
-                        placeholder="Escribe tu numero de teléfono"
-                        keyboardType="phone-pad"
-                        autoCapitalize="none"
-                        value={telefono}
-                        onChangeText={setTelefono}
-                    />
-                    <Text style={styles.label}>Correo electrónico:</Text>
-                    <TextInput
-                        style={styles.input}
-                        placeholder="Escribe tu correo electrónico"
-                        keyboardType="email-address"
-                        autoCapitalize="none"
-                        value={correo}
-                        onChangeText={setCorreo}
-                    />
-
-                    <Text style={styles.label}>Contraseña:</Text>
-                    <TextInput
-                        style={styles.input}
-                        placeholder="************"
-                        secureTextEntry
-                        value={contrasenia}
-                        onChangeText={setContrasenia}
-                    />
-                    <View style={styles.switchContainer}>
-
-                        <Text style={styles.switchLabel}>
-                            Enviar alertas de presupuesto a mi correo
-                        </Text>
-                        <Switch
-                            value={alertas}
-                            onValueChange={setAlertas}
-                            trackColor={{ false: '#d1d5db', true: '#0a57d9' }}
-                            thumbColor={alertas ? '#ffffff' : '#f4f3f4'}
-                        />
-                    </View>
-
-                    <Pressable style={styles.BotonInicio} onPress={() => { if (validacionRegistro()) setModalVisible(null); }}>
-                        <Text style={styles.BotonInicioText}>Iniciar sesión</Text>
-                    </Pressable>
+                            <Text style={styles.Titulo}>Registro</Text>
+                        </View>
 
 
-                </View>
+                        <View style={styles.Contain6}>
+                            <Text style={styles.label}>Nombre:</Text>
+                            <TextInput
+                                style={styles.input}
+                                placeholder="Escribe tu nombre"
+                                keyboardType="default"
+                                autoCapitalize="words"
+                                value={nombre}
+                                onChangeText={setNombre}
+                            />
+                            <Text style={styles.label}>Apellidos:</Text>
+                            <TextInput
+                                style={styles.input}
+                                placeholder="Escribe tus apellidos"
+                                keyboardType="default"
+                                autoCapitalize="words"
+                                value={apellidos}
+                                onChangeText={setApellidos}
+                            />
+                            <Text style={styles.label}>Número de teléfono:</Text>
+                            <TextInput
+                                style={styles.input}
+                                placeholder="Escribe tu numero de teléfono"
+                                keyboardType="phone-pad"
+                                autoCapitalize="none"
+                                value={telefono}
+                                onChangeText={setTelefono}
+                            />
+                            <Text style={styles.label}>Correo electrónico:</Text>
+                            <TextInput
+                                style={styles.input}
+                                placeholder="Escribe tu correo electrónico"
+                                keyboardType="email-address"
+                                autoCapitalize="none"
+                                value={correo}
+                                onChangeText={setCorreo}
+                            />
+
+                            <Text style={styles.label}>Contraseña:</Text>
+                            <TextInput
+                                style={styles.input}
+                                placeholder="************"
+                                secureTextEntry
+                                value={contrasenia}
+                                onChangeText={setContrasenia}
+                            />
+                            <View style={styles.switchContainer}>
+
+                                <Text style={styles.switchLabel}>
+                                    Enviar alertas de presupuesto a mi correo
+                                </Text>
+                                <Switch
+                                    value={alertas}
+                                    onValueChange={setAlertas}
+                                    trackColor={{ false: '#d1d5db', true: '#0a57d9' }}
+                                    thumbColor={alertas ? '#ffffff' : '#f4f3f4'}
+                                />
+                            </View>
+
+                            <Pressable style={styles.BotonInicio} onPress={async () => { const ok = await validacionRegistro(); if (ok) setModalVisible(null); }}>
+                                <Text style={styles.BotonInicioText}>Registrarme</Text>
+                            </Pressable>
 
 
-
-            </View>
+                        </View>
+                    </ScrollView>
+                </TouchableWithoutFeedback>
+            </KeyboardAvoidingView>
 
         </Modal>
 
@@ -256,41 +297,42 @@ export default function LoginScreen({ navigation }) {
             transparent={false}
             onRequestClose={() => setModalVisible(null)}
         >
-            <View style={styles.containerMain}>
+            <KeyboardAvoidingView style={styles.containerMain} behavior={Platform.OS === 'ios' ? 'padding' : 'height'} keyboardVerticalOffset={80}>
+                <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
+                    <ScrollView contentContainerStyle={{ flexGrow: 1 }} keyboardShouldPersistTaps="handled">
+                        <View style={styles.Encabezado2}>
+                            <View style={styles.Salir}>
+                                <Pressable onPress={() => setModalVisible(null)}>
+                                    <Text style={styles.Atras}>‹ Atras</Text>
+                                </Pressable>
 
-                <View style={styles.Encabezado2}>
-                    <View style={styles.Salir}>
-                        <Pressable onPress={() => setModalVisible(null)}>
-                            <Text style={styles.Atras}>‹ Atras</Text>
-                        </Pressable>
+                            </View>
 
-                    </View>
-
-                    <Text style={styles.Titulo}>Recuperar Contraseña</Text>
-                </View>
+                            <Text style={styles.Titulo}>Recuperar Contraseña</Text>
+                        </View>
 
 
-                <View style={styles.containContra}>
-                    <Text style={styles.label}>Correo electrónico:</Text>
-                    <TextInput
-                        style={styles.input}
-                        placeholder="Ingrese su correo electrónico"
-                        keyboardType="email-address"
-                        autoCapitalize="none"
-                        value={correo}
-                        onChangeText={setCorreo}
-                    />
+                        <View style={styles.containContra}>
+                            <Text style={styles.label}>Correo electrónico:</Text>
+                            <TextInput
+                                style={styles.input}
+                                placeholder="Ingrese su correo electrónico"
+                                keyboardType="email-address"
+                                autoCapitalize="none"
+                                value={correo}
+                                onChangeText={setCorreo}
+                            />
 
-                    <Pressable style={styles.BotonInicio} onPress={() => {
-                        if (validacionRecuperar()) {
-                            setModalVisible(null);
-                        }
-                    }}>
-                        <Text style={styles.BotonInicioText}>Enviar</Text>
-                    </Pressable>
-                </View>
-            </View>
-
+                            <Pressable style={styles.BotonInicio} onPress={async () => {
+                                const ok = await validacionRecuperar();
+                                if (ok) setModalVisible(null);
+                            }}>
+                                <Text style={styles.BotonInicioText}>Enviar</Text>
+                            </Pressable>
+                        </View>
+                    </ScrollView>
+                </TouchableWithoutFeedback>
+            </KeyboardAvoidingView>
 
         </Modal>
 

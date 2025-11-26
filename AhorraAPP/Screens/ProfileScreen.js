@@ -1,23 +1,168 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
-    View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView, SafeAreaView, Switch, Modal, Pressable
+  View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView, Switch, Modal, Pressable, Alert
 } from "react-native";
+import { UsuarioController } from '../controllers/UsuarioController';
+
+const usuarioController = new UsuarioController();
 
 export default function ProfileScreen({ navigation }) {
+  const [numCuenta, setNumCuenta] = useState("");
   const [nombre, setNombre] = useState("");
+  const [apellidos, setApellidos] = useState("");
+  const [userId, setUserId] = useState(null);
   const [celular, setCelular] = useState("");
   const [correo, setCorreo] = useState("");
   const [password, setPassword] = useState("");
   const [alertas, setAlertas] = useState(false);
   const [isModalVisible, setIsModalVisible] = useState(false);
 
+  useEffect(() => {
+    (async () => {
+      try {
+        await usuarioController.initialize();
+        console.log('[ProfileScreen] loading current user');
+        const user = await usuarioController.getCurrentUser();
+        console.log('[ProfileScreen] getCurrentUser ->', user && user.correo);
+        if (!user) {
+          // no hay usuario logueado
+          setUserId(null);
+          setNombre('');
+          setApellidos('');
+          setNumCuenta('');
+          setCelular('');
+          setCorreo('');
+          return;
+        }
+        setUserId(user.id);
+        setNombre(user.nombre || '');
+        setApellidos(user.apellidos || '');
+        setNumCuenta(user.cuenta || '');
+        setCelular(user.telefono || '');
+        setCorreo(user.correo || '');
+      } catch (err) {
+        console.warn('No se pudo cargar usuario en ProfileScreen', err);
+      }
+    })();
+  }, []);
+
+  // Recargar usuario cuando la pantalla recibe foco (por si se cambió de cuenta)
+  useEffect(() => {
+    const unsubscribe = navigation.addListener('focus', async () => {
+      try {
+        // volver a ejecutar la misma lógica de carga de usuario, pero usando getCurrentUser()
+        await usuarioController.initialize();
+        console.log('[ProfileScreen] focus -> reloading current user');
+        const user = await usuarioController.getCurrentUser();
+        console.log('[ProfileScreen] focus -> getCurrentUser ->', user && user.correo);
+        if (!user) {
+          setUserId(null);
+          setNombre('');
+          setApellidos('');
+          setNumCuenta('');
+          setCelular('');
+          setCorreo('');
+          return;
+        }
+        setUserId(user.id);
+        setNombre(user.nombre || '');
+        setApellidos(user.apellidos || '');
+        setNumCuenta(user.cuenta || '');
+        setCelular(user.telefono || '');
+        setCorreo(user.correo || '');
+      } catch (err) {
+        console.warn('No se pudo recargar usuario en ProfileScreen', err);
+      }
+    });
+    return unsubscribe;
+  }, [navigation]);
+
+  const handleLogout = () => {
+    (async () => {
+      try {
+        await usuarioController.logout();
+        Alert.alert('Sesión', 'Has cerrado sesión');
+        // limpiar UI
+        setUserId(null);
+        setNombre('');
+        setApellidos('');
+        setNumCuenta('');
+        setCelular('');
+        setCorreo('');
+        navigation.navigate('Login');
+      } catch (e) {
+        console.warn('Error al cerrar sesión', e);
+        Alert.alert('Error', 'No se pudo cerrar sesión');
+      }
+    })();
+  };
+
   const handleSave = () => {
-    // aquí podrías enviar datos al servidor o guardarlos en un store
-    setIsModalVisible(false);
+    (async () => {
+      try {
+        if (!userId) throw new Error('Usuario no identificado');
+
+        // Validaciones (similares a las del registro/login)
+        if (!nombre || nombre.trim() === '') {
+          Alert.alert('Error', 'El nombre no puede estar vacío');
+          return;
+        }
+        if (nombre.length > 50) {
+          Alert.alert('Error', 'El nombre no puede tener más de 50 caracteres');
+          return;
+        }
+        if (!correo || correo.trim() === '') {
+          Alert.alert('Error', 'El correo no puede estar vacío');
+          return;
+        }
+        if (!correo.includes('@') || !correo.includes('.')) {
+          Alert.alert('Error', 'El correo no es válido');
+          return;
+        }
+        if (celular && celular.trim().length > 0 && celular.trim().length < 7) {
+          Alert.alert('Error', 'El número de teléfono no es válido');
+          return;
+        }
+        if (password && password.length > 0 && password.length < 6) {
+          Alert.alert('Error', 'La contraseña debe tener al menos 6 caracteres');
+          return;
+        }
+
+        // Verificar unicidad de correo (no permita duplicados con otro id)
+        const usuarios = await usuarioController.obtenerUsuarios();
+        const conflict = usuarios.find(u => (u.correo || '').toLowerCase() === (correo || '').toLowerCase() && u.id !== userId);
+        if (conflict) {
+          Alert.alert('Error', 'El correo ya está registrado por otro usuario');
+          return;
+        }
+
+        const updates = {
+          nombre: nombre,
+          apellidos: apellidos,
+          telefono: celular,
+          correo: correo,
+        };
+        if (password && password.trim().length > 0) updates.password = password;
+
+        const actualizado = await usuarioController.actualizarUsuario(userId, updates);
+        // actualizar estado con lo devuelto
+        setNombre(actualizado.nombre || '');
+        setApellidos(actualizado.apellidos || '');
+        setNumCuenta(actualizado.cuenta || '');
+        setCelular(actualizado.telefono || '');
+        setCorreo(actualizado.correo || '');
+        setPassword('');
+        setIsModalVisible(false);
+        Alert.alert('Éxito', 'Información actualizada correctamente');
+      } catch (err) {
+        console.error('Error guardando cambios de perfil', err);
+        Alert.alert('Error', err.message || 'No se pudo actualizar la información');
+      }
+    })();
   };
 
   return (
-    <SafeAreaView style={styles.contenedor}>
+    <View style={styles.contenedor}>
       <ScrollView contentContainerStyle={styles.contenidoScroll}>
         {/* Header grande (recuadro azul) */}
         <View style={styles.recuadroAzul}>
@@ -47,9 +192,13 @@ export default function ProfileScreen({ navigation }) {
         {/* Pantalla principal del perfil: información y botón para abrir actualización */}
         <View style={[styles.tarjetaFormulario, { alignItems: 'flex-start' }]}>
           <Text style={styles.tituloFormulario}>Mi Cuenta</Text>
+          
+          <Text style={styles.etiqueta}>No. Cuenta</Text>
+          <Text style={{ marginBottom: 10 }}>{numCuenta || 'No proporcionado'}</Text>
+
 
           <Text style={styles.etiqueta}>Nombre</Text>
-          <Text style={{ marginBottom: 10 }}>{nombre || 'No proporcionado'}</Text>
+          <Text style={{ marginBottom: 10 }}>{nombre + " " + apellidos || 'No proporcionado'}</Text>
 
           <Text style={styles.etiqueta}>Celular</Text>
           <Text style={{ marginBottom: 10 }}>{celular || 'No proporcionado'}</Text>
@@ -59,6 +208,9 @@ export default function ProfileScreen({ navigation }) {
 
           <TouchableOpacity style={[styles.boton, { alignSelf: 'stretch' }]} onPress={() => setIsModalVisible(true)}>
             <Text style={styles.textoBoton}>Actualizar información</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={[styles.boton, { alignSelf: 'stretch', backgroundColor: '#6b7280', marginTop: 8 }]} onPress={handleLogout}>
+            <Text style={styles.textoBoton}>Cerrar sesión</Text>
           </TouchableOpacity>
         </View>
 
@@ -92,6 +244,15 @@ export default function ProfileScreen({ navigation }) {
                   placeholderTextColor="#999"
                   value={nombre}
                   onChangeText={setNombre}
+                />
+
+                <Text style={styles.etiqueta}>Apellidos del usuario</Text>
+                <TextInput
+                  style={styles.campo}
+                  placeholder="Ingresa tus apellidos"
+                  placeholderTextColor="#999"
+                  value={apellidos}
+                  onChangeText={setApellidos}
                 />
 
                 <Text style={styles.etiqueta}>Número Celular</Text>
@@ -145,7 +306,7 @@ export default function ProfileScreen({ navigation }) {
         </Modal>
 
       </ScrollView>
-    </SafeAreaView>
+    </View>
   );
 }
 

@@ -1,6 +1,10 @@
-import React, { useState } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, StyleSheet, Platform, Modal, Pressable, FlatList } from 'react-native';
+import React, { useState, useEffect } from 'react';
+import { View, Text, ScrollView, TouchableOpacity, StyleSheet, Platform, Modal, Pressable, FlatList, BackHandler, Alert } from 'react-native';
+import { useFocusEffect } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
+import { UsuarioController } from '../controllers/UsuarioController';
+
+const usuarioController = new UsuarioController();
 // --- IMPORTACIÓN DE GRÁFICO CIRCULAR ---
 import PieChart from 'react-native-pie-chart'; 
 
@@ -11,6 +15,55 @@ import PieChart from 'react-native-pie-chart';
 
 export default function GraficaScreen({ navigation }) {
     const [ruta, setRuta] = useState('principal'); 
+    const [isLoggedIn, setIsLoggedIn] = useState(false);
+
+    useEffect(() => {
+        let mounted = true;
+        (async () => {
+            try {
+                await usuarioController.initialize();
+                const u = await usuarioController.getCurrentUser();
+                if (mounted) setIsLoggedIn(!!u);
+            } catch (e) {
+                console.warn('[GraficaScreen] init check current user error', e);
+            }
+        })();
+
+        // Back handler is registered only while this screen is focused (see useFocusEffect below)
+        return () => { mounted = false; };
+    }, [isLoggedIn]);
+
+    // Register back handler only when this screen is focused
+    useFocusEffect(
+        React.useCallback(() => {
+            const onBackPress = () => {
+                if (isLoggedIn) {
+                    Alert.alert(
+                        'Salir',
+                        '¿Deseas cerrar sesión?',
+                        [
+                            { text: 'Cancelar', style: 'cancel', onPress: () => {} },
+                            { text: 'Cerrar sesión', style: 'destructive', onPress: async () => {
+                                try { await usuarioController.logout(); } catch (e) { console.warn('[GraficaScreen] logout error', e); }
+                                try { navigation.reset({ index: 0, routes: [{ name: 'Login' }] }); }
+                                catch (e) { try { navigation.navigate('Login'); } catch (e2) { navigation.popToTop(); } }
+                            } }
+                        ]
+                    );
+                    return true;
+                }
+                return false;
+            };
+
+            const subscription = BackHandler.addEventListener('hardwareBackPress', onBackPress);
+            return () => {
+                try {
+                    if (subscription && typeof subscription.remove === 'function') subscription.remove();
+                    else if (BackHandler.removeEventListener) BackHandler.removeEventListener('hardwareBackPress', onBackPress);
+                } catch (e) { console.warn('[GraficaScreen] error removing BackHandler listener', e); }
+            };
+        }, [isLoggedIn])
+    );
     return ruta === 'principal' ? (
         <Principal navigation={navigation} onVerDetalle={() => setRuta('detalle')} />
     ) : (
