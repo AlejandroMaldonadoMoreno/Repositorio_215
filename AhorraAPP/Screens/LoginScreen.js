@@ -95,8 +95,10 @@ export default function LoginScreen({ navigation }) {
             setModalVisible(null);
             return true;
         } catch (e) {
-            console.error('Registro error', e);
-            Alert.alert('Error', e.message || 'No se pudo registrar el usuario');
+            // Mostrar mensaje amigable al usuario y evitar imprimir trazas innecesarias
+            const msg = (e && e.userMessage) || (e && e.message) || 'No se pudo registrar el usuario';
+            console.warn('Registro error:', msg);
+            Alert.alert('Error', msg);
             return false;
         }
     };

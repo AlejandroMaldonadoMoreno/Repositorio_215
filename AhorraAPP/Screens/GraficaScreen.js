@@ -3,6 +3,7 @@ import { View, Text, ScrollView, TouchableOpacity, StyleSheet, Platform, Modal, 
 import { useFocusEffect } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { UsuarioController } from '../controllers/UsuarioController';
+import DatabaseService from '../database/DataBaseService';
 
 const usuarioController = new UsuarioController();
 // --- IMPORTACIÓN DE GRÁFICO CIRCULAR ---
@@ -17,6 +18,7 @@ export default function GraficaScreen({ navigation }) {
     const [ruta, setRuta] = useState('principal'); 
     const [isLoggedIn, setIsLoggedIn] = useState(false);
 
+    
     useEffect(() => {
         let mounted = true;
         (async () => {
@@ -76,11 +78,200 @@ export default function GraficaScreen({ navigation }) {
 // --- Vista Principal ---
 function Principal({ onVerDetalle, navigation }) {
     const [notifVisible, setNotifVisible] = useState(false);
-    const [notifications] = useState([
-        { id: 'n1', title: 'Pago recibido', body: 'Has recibido $1,200.00', time: 'Hoy 10:30' },
-        { id: 'n2', title: 'Alerta presupuesto', body: 'Estás cerca de tu límite en Comida', time: 'Ayer 18:12' },
-        { id: 'n3', title: 'Recordatorio', body: 'Paga tu servicio de agua', time: 'Hace 2 días' },
-    ]);
+    const [notifications, setNotifications] = useState([]);
+    const [user, setUser] = useState(null);
+    const [transactions, setTransactions] = useState([]);
+    const [budgets, setBudgets] = useState([]);
+    const [usersList, setUsersList] = useState([]);
+    const [loadingData, setLoadingData] = useState(true);
+    const [saldoDisponible, setSaldoDisponible] = useState(null);
+    const [categoryTotals, setCategoryTotals] = useState([]);
+    const [chartModalVisible, setChartModalVisible] = useState(false);
+
+    const loadUserData = async () => {
+        setLoadingData(true);
+        try {
+            await usuarioController.initialize();
+            const u = await usuarioController.getCurrentUser();
+            setUser(u);
+            if (!u) {
+                setTransactions([]);
+                setBudgets([]);
+                setLoadingData(false);
+                return;
+            }
+            let txs = [];
+            let buds = [];
+            try {
+                if (DatabaseService && typeof DatabaseService.getTransactions === 'function') {
+                    const r = await DatabaseService.getTransactions(u.id, { limit: 1000 });
+                    txs = Array.isArray(r) ? r : [];
+                    // compute saldo from all transactions (sum of monto)
+                    try {
+                        const all = txs;
+                        const sum = (all || []).reduce((s, t) => s + (Number(t.monto) || 0), 0);
+                        setSaldoDisponible(sum);
+                    } catch (e) {
+                        console.warn('[GraficaScreen] error computing saldo', e);
+                        setSaldoDisponible(null);
+                    }
+                } else {
+                    console.warn('[GraficaScreen] DatabaseService.getTransactions not available');
+                }
+            } catch (e) {
+                console.warn('[GraficaScreen] error getting transactions', e);
+                txs = [];
+            }
+                // load all users to resolve counterparty names (fallback-safe)
+                try {
+                    if (DatabaseService && typeof DatabaseService.getAll === 'function') {
+                        const allUsers = await DatabaseService.getAll();
+                        setUsersList(Array.isArray(allUsers) ? allUsers : []);
+                    }
+                } catch (e) {
+                    console.warn('[GraficaScreen] error getting all users', e);
+                    setUsersList([]);
+                }
+            try {
+                if (DatabaseService && typeof DatabaseService.getBudgets === 'function') {
+                    const r2 = await DatabaseService.getBudgets(u.id);
+                    buds = Array.isArray(r2) ? r2 : [];
+                } else {
+                    console.warn('[GraficaScreen] DatabaseService.getBudgets not available');
+                }
+                // load mails/notifications for the user
+                try {
+                    if (DatabaseService && typeof DatabaseService.getMails === 'function') {
+                        const mails = await DatabaseService.getMails(u.id, { limit: 50 });
+                        setNotifications(Array.isArray(mails) ? mails : []);
+                    }
+                } catch (e) {
+                    console.warn('[GraficaScreen] error getting mails', e);
+                    setNotifications([]);
+                }
+            } catch (e) {
+                console.warn('[GraficaScreen] error getting budgets', e);
+                buds = [];
+            }
+            setTransactions(txs);
+            setBudgets(buds);
+            // compute category totals FROM BUDGETS (presupuestos)
+            try {
+                const results = [];
+                const palette = ['#36D36C','#FFD15C','#0A84FF','#3AA0FF','#FF6B6B','#A259FF','#FFB86B','#4CD964','#FF9F43','#7BD389'];
+                const getColorForName = (n) => {
+                    if (!n) return palette[0];
+                    let s = 0;
+                    for (let i = 0; i < n.length; i++) s = (s * 31 + n.charCodeAt(i)) >>> 0;
+                    return palette[s % palette.length];
+                };
+                if (Array.isArray(buds) && buds.length > 0) {
+                    for (const b of buds) {
+                        const nombre = (b.nombre && b.nombre.toString()) || 'Presupuesto';
+                        const limite = Number(b.limite) || 0;
+                        const gastado = Number(b.gastado) || 0;
+                        const color = getColorForName(nombre);
+                        results.push({ name: nombre, color, limite, gastado });
+                    }
+                }
+                setCategoryTotals(results);
+            } catch (e) {
+                console.warn('[GraficaScreen] error computing category totals from budgets', e);
+                setCategoryTotals([]);
+            }
+        } catch (e) {
+            console.warn('[GraficaScreen] loadUserData error', e);
+            setTransactions([]);
+            setBudgets([]);
+            setSaldoDisponible(null);
+        } finally {
+            setLoadingData(false);
+        }
+    };
+
+    const renderChartAndLegend = (inModal = false) => {
+        return (
+            <>
+                {/* Leyenda basada en presupuestos (vacía si no hay registros) */}
+                <View style={styles.legend}>
+                    {categoryTotals && categoryTotals.length > 0 ? (
+                        categoryTotals.map(cat => (
+                            <View key={cat.name} style={styles.legendItem}>
+                                <View style={[styles.dot, { backgroundColor: cat.color }]} />
+                                <Text style={styles.legendText}>{cat.name}</Text>
+                            </View>
+                        ))
+                    ) : (
+                        <View style={{ padding: 12, alignItems: 'center' }}>
+                            <Text style={{ color: '#888' }}>No hay presupuestos para mostrar.</Text>
+                        </View>
+                    )}
+                </View>
+
+                {/* GRÁFICO (Barras dobles) */}
+                <View style={styles.chartCard}>
+                    {categoryTotals && categoryTotals.length > 0 ? (
+                        <ScrollView
+                            horizontal
+                            showsHorizontalScrollIndicator={false}
+                            
+                        >
+                            <View style={[styles.barsRow, { flexDirection: 'row' }]}> 
+                                {(() => {
+                                    const maxVal = Math.max(...categoryTotals.flatMap(c => [c.limite || 0, c.gastado || 0]), 1);
+                                    return categoryTotals.map(cat => {
+                                        const limiteH = Math.round(((cat.limite || 0) / maxVal) * (metrics.chartH * 0.9));
+                                        const gastadoH = Math.round(((cat.gastado || 0) / maxVal) * (metrics.chartH * 0.9));
+                                        return (
+                                            <View key={cat.name} style={[styles.doubleBar ]}>
+                                                <View style={{flexDirection: 'row', alignItems: 'flex-end'}}>
+                                                    <View style={[styles.bar, { height: gastadoH, backgroundColor: cat.color }]} />
+                                                    <View style={[styles.bar, { height: limiteH, backgroundColor: (cat.color || '#ccc') + '66' }]} />
+                                                </View>
+                                                <Text style={styles.barLabel}>{cat.name}</Text>
+                                            </View>
+                                        );
+                                    });
+                                })()}
+                            </View>
+                        </ScrollView>
+                    ) : (
+                        <View style={{ padding: 24, alignItems: 'center' }}>
+                            <Text style={{ color: '#888' }}>No hay presupuestos para mostrar.</Text>
+                        </View>
+                    )}
+                    <Text style={styles.chartNote}>Nota: Los colores codificados coinciden con la leyenda.</Text>
+                </View>
+            </>
+        );
+    };
+
+    useFocusEffect(
+        React.useCallback(() => {
+            loadUserData();
+        }, [])
+    );
+
+    // derive recent transactions (sorted by date-like fields) and limit to 3
+    const recentTransactions = (transactions || []).slice().sort((a, b) => {
+        const getTime = (t) => {
+            if (!t) return 0;
+            const candidates = [t.fecha, t.created_at, t.createdAt, t.ts, t.time];
+            for (const c of candidates) {
+                if (!c) continue;
+                const n = Date.parse(c);
+                if (!isNaN(n)) return n;
+                const num = Number(c);
+                if (!isNaN(num) && num > 0) return num;
+            }
+            if (t.id) {
+                const idn = Number(t.id);
+                if (!isNaN(idn)) return idn;
+            }
+            return 0;
+        };
+        return getTime(b) - getTime(a);
+    }).slice(0, 3);
 
     return (
         <View style={[styles.container, { backgroundColor: palette.bg }] }>
@@ -90,17 +281,18 @@ function Principal({ onVerDetalle, navigation }) {
             <ScrollView style={{ flex: 1 }} contentContainerStyle={{ padding: 16 }}>
 
                 <View style={[styles.cardBalance]}>
+           
                     <Text style={styles.small}>Saldo Disponible</Text>
-                    <Text style={styles.balance}>$ 23403.74</Text>
+                    <Text style={styles.balance}>$ {typeof saldoDisponible === 'number' ? saldoDisponible.toFixed(2) : '0.00'}</Text>
 
                     <View style={styles.rowBetween}>
-                        <TouchableOpacity style={styles.ctaButton} 
+                        <TouchableOpacity style={styles.ctaButton}
                             activeOpacity={0.8}
                             onPress={() => navigation.navigate('Profile')}
                         >
                             <Text style={styles.ctaText}>Mi Cuenta</Text>
                         </TouchableOpacity>
-                        
+
                         <TouchableOpacity style={styles.circleIcon} onPress={() => setNotifVisible(true)}>
                             <Ionicons
                                 name="mail"
@@ -119,44 +311,8 @@ function Principal({ onVerDetalle, navigation }) {
                     </View>
 
                     <View style={styles.legendAndChart}>
-                        {/* Leyenda con nuevos colores (dots) */}
-                        <View style={styles.legend}>
-                            <View style={styles.legendItem}><View style={[styles.dot, {backgroundColor: '#3AA0FF'}]} /><Text style={styles.legendText}>Otros</Text></View>
-                            <View style={styles.legendItem}><View style={[styles.dot, {backgroundColor: '#36D36C'}]} /><Text style={styles.legendText}>Comida</Text></View>
-                            <View style={styles.legendItem}><View style={[styles.dot, {backgroundColor: '#FFD15C'}]} /><Text style={styles.legendText}>Ocio</Text></View>
-                            <View style={styles.legendItem}><View style={[styles.dot, {backgroundColor: '#0A84FF'}]} /><Text style={styles.legendText}>Agua</Text></View>
-                            {/* Mensaje de advertencia */}
-                            <Text style={styles.warningMessage}>
-                                <Ionicons name="alert-circle-outline" size={14} color="#FF3B30" /> Has excedido tu presupuesto de Comida con: $xxxx
-                            </Text>
-                        </View>
-
-                        {/* GRÁFICO (Barras dobles) */}
-                        <View style={styles.chartCard}>
-                            <View style={styles.barsRow}>
-                                {/* Otros */}
-                                <View style={styles.doubleBar}>
-                                    <View style={[styles.bar, { height: 90 }, {backgroundColor: '#0A84FF'}]} />
-                                    <View style={[styles.bar, { height: 75 }, {backgroundColor: 'rgba(58, 160, 255, 0.4)'}]} />
-                                </View>
-                                {/* Comida */}
-                                <View style={styles.doubleBar}>
-                                    <View style={[styles.bar, { height: 120 }, {backgroundColor: '#36D36C'}]} />
-                                    <View style={[styles.bar, { height: 100 }, {backgroundColor: 'rgba(54, 211, 108, 0.4)'}]} />
-                                </View>
-                                {/* Ocio */}
-                                <View style={styles.doubleBar}>
-                                    <View style={[styles.bar, { height: 100 }, {backgroundColor: '#FFD15C'}]} />
-                                    <View style={[styles.bar, { height: 85 }, {backgroundColor: 'rgba(255, 209, 92, 0.4)'}]} />
-                                </View>
-                                {/* Agua */}
-                                <View style={styles.doubleBar}>
-                                    <View style={[styles.bar, { height: 130 }, {backgroundColor: '#0A84FF'}]} />
-                                    <View style={[styles.bar, { height: 110 }, {backgroundColor: 'rgba(58, 160, 255, 0.4)'}]} />
-                                </View>
-                            </View>
-                            <Text style={styles.chartNote}>Nota: Los colores codificados coinciden con la leyenda.</Text>
-                        </View>
+                        {/* render chart+legend as a reusable block so we can show it in a modal */}
+                        {renderChartAndLegend()}
                     </View>
                 </View>
 
@@ -171,24 +327,54 @@ function Principal({ onVerDetalle, navigation }) {
                         </TouchableOpacity>
                     </View>
 
-                    {/* Items */}
-                    <View style={styles.movementItem}>
-                        <View style={styles.movLeft}><View style={styles.circleSmall} /></View>
-                        <View style={styles.movMiddle}>
-                            <Text style={styles.movTitle}>Movimiento 1</Text>
-                            <Text style={styles.movDate}>1 de agosto 2025</Text>
+                    {/* Items: mostrar transacciones reales del usuario (máx. 5) */}
+                    {(!recentTransactions || recentTransactions.length === 0) ? (
+                        <View style={{ padding: 12, alignItems: 'center' }}>
+                            <Text style={{ color: '#888' }}>No hay movimientos recientes.</Text>
                         </View>
-                        <Text style={[styles.movAmount, { color: '#FF3B30' }]}>- $365.90</Text>
-                    </View>
-
-                    <View style={styles.movementItem}>
-                        <View style={styles.movLeft}><View style={styles.circleSmall} /></View>
-                        <View style={styles.movMiddle}>
-                            <Text style={styles.movTitle}>Movimiento 2</Text>
-                            <Text style={styles.movDate}>28 de julio 2025</Text>
-                        </View>
-                        <Text style={[styles.movAmount, { color: '#0A84FF' }]}>+ $2640.00</Text>
-                    </View>
+                    ) : (
+                        recentTransactions.map(tx => {
+                            const monto = Number(tx.monto) || 0;
+                            const isNegative = monto < 0;
+                            // determine counterparty from metadata when available
+                            let counterparty = '';
+                            try {
+                                let meta = tx.metadata;
+                                if (meta && typeof meta === 'string') {
+                                    try { meta = JSON.parse(meta); } catch (e) { /* keep as string */ }
+                                }
+                                const cpId = meta && (meta.fromUserId || meta.toUserId || meta.toUser || meta.fromUser);
+                                if (cpId) {
+                                    const found = (usersList || []).find(u => String(u.id) === String(cpId));
+                                    if (found) counterparty = found.nombre || found.correo || found.cuenta || '';
+                                }
+                            } catch (e) { /* ignore */ }
+                            const title = monto > 0 ? (`Recibido${counterparty ? ' de ' + counterparty : ''}`) : (`Enviado${counterparty ? ' a ' + counterparty : ''}`);
+                            let dateLabel = '';
+                            try {
+                                const d = tx.fecha || tx.created_at || tx.createdAt || tx.ts;
+                                if (d) {
+                                    const parsed = Date.parse(d);
+                                    if (!isNaN(parsed)) dateLabel = new Date(parsed).toLocaleDateString();
+                                    else {
+                                        const n = Number(d);
+                                        if (!isNaN(n) && n > 0) dateLabel = new Date(n).toLocaleDateString();
+                                    }
+                                }
+                            } catch (e) { /* ignore */ }
+                            const key = tx.id || tx._id || `${dateLabel}_${monto}_${title}`;
+                            return (
+                                <View key={key} style={styles.movementItem}>
+                                    <View style={styles.movLeft}><View style={styles.circleSmall} /></View>
+                                    <View style={styles.movMiddle}>
+                                        <Text style={styles.movTitle}>{title}</Text>
+                                        <Text style={styles.movDate}>{dateLabel}</Text>
+                                    </View>
+                                    <Text style={[styles.movAmount, { color: isNegative ? '#FF3B30' : '#0A84FF' }]}>{isNegative ? `- $${Math.abs(monto).toFixed(2)}` : `+ $${monto.toFixed(2)}`}</Text>
+                                </View>
+                            );
+                        })
+                    )}
                 </View>
             </ScrollView>
             <Modal visible={notifVisible} animationType="fade" transparent onRequestClose={() => setNotifVisible(false)}>
@@ -203,15 +389,33 @@ function Principal({ onVerDetalle, navigation }) {
 
                         <FlatList
                             data={notifications}
-                            keyExtractor={item => item.id}
+                            keyExtractor={item => String(item.id)}
                             renderItem={({ item }) => (
                                 <View style={styles.notifItem}>
-                                    <Text style={styles.notifTitle}>{item.title}</Text>
+                                    <Text style={styles.notifTitle}>{item.subject || item.title || 'Mensaje'}</Text>
                                     <Text style={styles.notifBody}>{item.body}</Text>
-                                    <Text style={styles.notifTime}>{item.time}</Text>
+                                    <Text style={styles.notifTime}>{item.fecha ? new Date(item.fecha).toLocaleString() : ''}</Text>
                                 </View>
                             )}
                         />
+                    </View>
+                </View>
+            </Modal>
+            {/* Chart detail modal (vertical scroll) */}
+            <Modal visible={chartModalVisible} animationType="slide" transparent onRequestClose={() => setChartModalVisible(false)}>
+                <View style={styles.modalOverlay}>
+                    <View style={[styles.modalBox, { maxHeight: '90%' }]}>
+                        <View style={styles.modalHeaderRow}>
+                            <Text style={styles.modalTitle}>Detalle de presupuestos</Text>
+                            <Pressable onPress={() => setChartModalVisible(false)} style={styles.closeButton}>
+                                <Text style={styles.closeButtonText}>Cerrar</Text>
+                            </Pressable>
+                        </View>
+                        <ScrollView>
+                            <View style={{ paddingBottom: 20 }}>
+                                {renderChartAndLegend(true)}
+                            </View>
+                        </ScrollView>
                     </View>
                 </View>
             </Modal>
@@ -223,56 +427,106 @@ function Principal({ onVerDetalle, navigation }) {
 
 // --- Vista Detalle ---
 function Detalle({ onVolver }) {
-    // --- Datos para el PieChart (CORRECCIÓN FINAL) ---
-    // La librería espera un array de objetos, cada uno con 'value' y 'color'.
+    const [transactions, setTransactions] = useState([]);
+    const [loading, setLoading] = useState(true);
+    const [totals, setTotals] = useState({ ingresos: 0, gastos: 0 });
+
+    useEffect(() => {
+        let mounted = true;
+        (async () => {
+            setLoading(true);
+            try {
+                await usuarioController.initialize();
+                const u = await usuarioController.getCurrentUser();
+                if (!u) {
+                    if (mounted) {
+                        setTransactions([]);
+                        setTotals({ ingresos: 0, gastos: 0 });
+                    }
+                    return;
+                }
+                let txs = [];
+                try {
+                    if (DatabaseService && typeof DatabaseService.getTransactions === 'function') {
+                        const r = await DatabaseService.getTransactions(u.id, { limit: 1000 });
+                        txs = Array.isArray(r) ? r : [];
+                    }
+                } catch (e) {
+                    console.warn('[GraficaScreen.Detalle] error getting transactions', e);
+                    txs = [];
+                }
+                if (!mounted) return;
+                setTransactions(txs);
+                const ingresos = (txs || []).reduce((s, t) => s + ((Number(t.monto) || 0) > 0 ? Number(t.monto) : 0), 0);
+                const gastos = (txs || []).reduce((s, t) => s + ((Number(t.monto) || 0) < 0 ? Math.abs(Number(t.monto)) : 0), 0);
+                if (mounted) setTotals({ ingresos, gastos });
+            } catch (e) {
+                console.warn('[GraficaScreen.Detalle] load error', e);
+            } finally {
+                if (mounted) setLoading(false);
+            }
+        })();
+        return () => { mounted = false; };
+    }, []);
+
+    const total = totals.ingresos + totals.gastos;
     const widthAndHeight = 160;
-    const series = [
-        { value: 65, color: '#36D36C' }, // 65% ingresos (Verde)
-        { value: 35, color: '#FF3B30' }, // 35% gastos (Rojo)
-    ];
+    const series = total > 0 ? [
+        { value: totals.ingresos || 0, color: '#36D36C' },
+        { value: totals.gastos || 0, color: '#FF3B30' },
+    ] : [];
 
     return (
         <View style={[styles.container, { backgroundColor: palette.bg }] }>
             <View style={styles.fondoAzul} />
             <View style={styles.fondoInferior} />
 
-            {/* Header removed — main content starts here for Detalle */}
-
             <ScrollView style={{ flex: 1 }} contentContainerStyle={{ padding: 16 }}>
                 <View style={[styles.cardBalance]}>
                     <Text style={styles.small}>Saldo Disponible</Text>
-                    <Text style={styles.balance}>$ 23403.74</Text>
+                    <Text style={styles.balance}>$ {((totals.ingresos - totals.gastos) || 0).toFixed(2)}</Text>
                 </View>
 
                 <View style={styles.sectionCard}>
-                    {/* Título de la sección "Ingresos y Gastos" */}
                     <View style={styles.sectionHeaderRow}>
                         <Text style={styles.sectionTitle}>Ingresos y Gastos</Text>
                         <TouchableOpacity onPress={onVolver}><Text style={styles.link}>Volver</Text></TouchableOpacity>
                     </View>
 
                     <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 12 }}>
-                        {/* --- IMPLEMENTACIÓN CORREGIDA --- */}
-                        {/* Pasamos el array de objetos directamente a 'series' */}
-                        {/* Y eliminamos la prop 'sliceColor' */}
-                        <PieChart
-                            widthAndHeight={widthAndHeight}
-                            series={series} // <-- ¡AQUÍ ESTÁ LA CORRECCIÓN!
-                            // sliceColor prop ya no es necesaria
-                            coverRadius={0.45} 
-                            coverFill={'#FFF'} 
-                        />
-                        <View style={{ flex: 1, paddingLeft: 16 }}>
-                            {/* Leyenda de Ingresos y Gastos */}
-                            <View style={styles.legendItem}><View style={[styles.dot, {backgroundColor: '#36D36C'}]} /><Text>Ingresos</Text></View>
-                            <View style={styles.legendItem}><View style={[styles.dot, {backgroundColor: '#FF3B30'}]} /><Text>Gastos</Text></View>
+                        <View style={{ width: 160, height: 160, alignItems: 'center', justifyContent: 'center' }}>
+                            {loading ? (
+                                <Text>Cargando...</Text>
+                            ) : (!transactions || transactions.length === 0) ? (
+                                <View style={styles.piePlaceholder}><Text style={{ color: '#fff', fontWeight: '700', textAlign: 'center', paddingHorizontal: 8 }}>Sin movimientos</Text></View>
+                            ) : (total === 0) ? (
+                                <View style={styles.piePlaceholder}><Text style={{ color: '#fff', fontWeight: '700', textAlign: 'center', paddingHorizontal: 8 }}>No hay ingresos ni gastos registrados</Text></View>
+                            ) : (
+                                <PieChart
+                                    widthAndHeight={widthAndHeight}
+                                    series={series}
+                                    coverRadius={0.45}
+                                    coverFill={'#FFF'}
+                                />
+                            )}
+                        </View>
+
+                        <View style={styles.legendBlock}>
+                            {( !transactions || transactions.length === 0 || (totals.ingresos + totals.gastos) === 0) ? (
+                                <View style={{ padding: 12, alignItems: 'center', justifyContent: 'center' }}>
+                                    <Text style={{ color: '#666', fontWeight: '600', flex: 1, textAlign: 'flex-start', paddingRight: 50 }}>No hay ingresos ni gastos registrados</Text>
+                                </View>
+                            ) : (
+                                <>
+                                    <View style={styles.legendItem}><View style={[styles.dot, { backgroundColor: '#36d36c' }]} /><Text>Ingresos: $ {totals.ingresos.toFixed(2)}</Text></View>
+                                    <View style={styles.legendItem}><View style={[styles.dot, { backgroundColor: '#ff3b30' }]} /><Text>Gastos: $ {totals.gastos.toFixed(2)}</Text></View>
+                                </>
+                            )}
                         </View>
                     </View>
 
-                    {/* Mensaje "Tus ingresos superan..." */}
-                    <View style={{ marginTop: 12, flexDirection: 'row', alignItems: 'center' }}>
-                        <Ionicons name="checkmark-circle-outline" size={16} color="#36D36C" style={{ marginRight: 5 }} />
-                        <Text style={{ color: palette.text }}>Tus ingresos superan a tus gastos este mes.</Text>
+                    <View style={{ marginTop: 12 }}>
+                        <Text style={{ color: '#666' }}>- Aquí puedes ver el detalle por categoría en una vista ampliada.</Text>
                     </View>
                 </View>
             </ScrollView>
@@ -300,7 +554,7 @@ const metrics = {
     circle: 40,
     dot: 12,
     barW: 18,
-    chartH: 140,
+    chartH: 100,
     doubleBarW: 38,
 };
 
@@ -351,6 +605,8 @@ const styles = StyleSheet.create({
         alignItems: 'center',
     },
 
+    
+
     sectionCard: { backgroundColor: palette.card, marginTop: 18, borderRadius: metrics.r, padding: metrics.pSm, elevation: 1 },
     sectionHeaderRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 },
     sectionTitle: { fontSize: 16, fontWeight: '700' },
@@ -358,9 +614,10 @@ const styles = StyleSheet.create({
 
     legendAndChart: { flexDirection: 'row', gap: 12 },
     legend: { flex: 1, justifyContent: 'center' },
+    legendBlock: { flex: 1, paddingLeft: 16, justifyContent: 'center' },
     legendItem: { flexDirection: 'row', alignItems: 'center', marginBottom: 8 },
     dot: { width: metrics.dot, height: metrics.dot, borderRadius: metrics.dot / 2, marginRight: 8 },
-    legendText: { fontSize: 14, color: palette.text },
+    legendText: { fontSize: 12, color: palette.text },
     
     warningMessage: {
         color: '#FF3B30',
@@ -373,18 +630,30 @@ const styles = StyleSheet.create({
     chartCard: { flex: 1.6, backgroundColor: palette.card, borderRadius: 8, padding: metrics.pSm, borderWidth: 1, borderColor: palette.border },
     barsRow: { flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'space-around', height: metrics.chartH },
     
-    doubleBar: { 
-        flexDirection: 'row', 
-        alignItems: 'flex-end',
-        width: metrics.doubleBarW, 
+    doubleBar: {  
+        alignItems: 'center',
+        width: 'auto', 
         justifyContent: 'space-between', 
     },
     bar: { 
         width: metrics.barW * 0.8, 
         borderRadius: 4,
     },
+    barLabel: {
+        fontSize: 12,
+        textAlign: 'center',
+        marginTop: 6,
+        width: 'auto',
+        paddingHorizontal: 8,
+        alignSelf: 'center',
+        color: '#333',
+        fontWeight: '600',
+    },
+    legendText: { fontSize: 12, color: palette.text, maxWidth: 140 },
 
     chartNote: { fontSize: 12, color: '#888', marginTop: 8, textAlign: 'center' },
+
+    piePlaceholder: { width: 160, height: 160, borderRadius: 80, backgroundColor: '#36d36c', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' },
 
     movementItem: { flexDirection: 'row', alignItems: 'center', paddingVertical: 12, borderTopWidth: 1, borderTopColor: '#f0f0f0' },
     movLeft: { width: 40, alignItems: 'center' },

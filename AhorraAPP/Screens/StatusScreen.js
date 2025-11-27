@@ -1,26 +1,23 @@
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Modal, TextInput } from 'react-native';
-import React, { useState } from 'react';
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Modal, TextInput, Alert } from 'react-native';
+import React, { useState, useEffect } from 'react';
+import { useFocusEffect } from '@react-navigation/native';
 
 import Pantalla_Transacciones from './Pantalla_Transacciones.instructions';
+import DatabaseService from '../database/DataBaseService';
+import { UsuarioController } from '../controllers/UsuarioController';
 
+const usuarioController = new UsuarioController();
 
 export default function StatusScreen({ navigation }) {
 
-    const [movimientos, setMovimientos] = useState([
-        { id: 'm1', title: 'Movimento 1', tag: 'Pagaste - concepto: Pago del auto', amount: '$ 25,000.75', date: '14 de noviembre de 2025', time: '10:30' },
-        { id: 'm2', title: 'Movimento 2', tag: 'Recibiste - concepto: Venta de bicicleta', amount: '$ 45,000.13', date: '13 de noviembre de 2025', time: '14:15' },
-        { id: 'm3', title: 'Movimento 3', tag: 'Recibiste - concepto: Cobro de alquileres', amount: '$ 5,450.00', date: '12 de noviembre de 2025', time: '09:45' },
-        { id: 'm4', title: 'Movimento 4', tag: 'Pagaste - concepto: Compra de libros', amount: '$ 1,000.13', date: '11 de noviembre de 2025', time: '16:20' },
-    ]);
+    const [movimientos, setMovimientos] = useState([]);
+    const [monthlyBudgets, setMonthlyBudgets] = useState([]);
+    const [saldo, setSaldo] = useState(0);
+    const [user, setUser] = useState(null);
+    const [usersList, setUsersList] = useState([]);
+    const [loading, setLoading] = useState(true);
 
     // Presupuestos Mensuales
-    const [monthlyBudgets, setMonthlyBudgets] = useState([
-        { id: 'mb1', concept: 'Alimentación', limit: '500.00', spent: '100.50', month: new Date().getMonth() + 1, year: new Date().getFullYear() },
-        { id: 'mb2', concept: 'Transporte', limit: '200.00', spent: '150.00', month: new Date().getMonth() + 1, year: new Date().getFullYear() },
-        { id: 'mb3', concept: 'Entretenimiento', limit: '300.00', spent: '290.75', month: new Date().getMonth() + 1, year: new Date().getFullYear() },
-        { id: 'mb4', concept: 'Videjuegos', limit: '600.00', spent: '200.00', month: new Date().getMonth() + 1, year: new Date().getFullYear() },
-
-    ]);
 
     const [monthlyModalVisible, setMonthlyModalVisible] = useState(false);
     const [editingMonthlyId, setEditingMonthlyId] = useState(null);
@@ -43,83 +40,217 @@ export default function StatusScreen({ navigation }) {
 
     // Función para ordenar/filtrar movimientos con filtros combinables
     const getOrderedMovimientos = () => {
-        // Helper: cambio a español "14 de noviembre de 2025" y hora "10:30" 
-        const parseSpanishDateTime = (dateStr, timeStr) => {
-            if (!dateStr) return new Date(0);
-            const monthMap = {
-                enero: 0, febrero: 1, marzo: 2, abril: 3, mayo: 4, junio: 5,
-                julio: 6, agosto: 7, septiembre: 8, octubre: 9, noviembre: 10, diciembre: 11
-            };
+        // Robust ordering/filtering that understands DB transaction shape
+        const parseDateFromTx = (tx) => {
             try {
-                const m = dateStr.toString().toLowerCase().match(/(\d{1,2})\s+de\s+([a-zñ]+)\s+de\s+(\d{4})/i);
-                if (m) {
-                    const day = parseInt(m[1], 10);
-                    const monthName = m[2];
-                    const year = parseInt(m[3], 10);
-                    const month = monthMap[monthName] !== undefined ? monthMap[monthName] : 0;
-                    let hours = 0, minutes = 0;
-                    if (timeStr) {
-                        const t = timeStr.toString().match(/(\d{1,2}):(\d{2})/);
-                        if (t) { hours = parseInt(t[1], 10); minutes = parseInt(t[2], 10); }
-                    }
-                    return new Date(year, month, day, hours, minutes);
+                if (!tx) return new Date(0);
+                // prefer ISO `fecha` from DB
+                if (tx.fecha) {
+                    const d = new Date(tx.fecha);
+                    if (!isNaN(d)) return d;
                 }
-                // Fallback to Date parsing if format differs
-                const fallback = new Date(dateStr);
-                if (!isNaN(fallback)) return fallback;
+                // fallback to `date` + `time` friendly parsing (spanish format)
+                if (tx.date) {
+                    const monthMap = { enero:0,febrero:1,marzo:2,abril:3,mayo:4,junio:5,julio:6,agosto:7,septiembre:8,octubre:9,noviembre:10,diciembre:11 };
+                    try {
+                        const m = tx.date.toString().toLowerCase().match(/(\d{1,2})\s+de\s+([a-zñ]+)\s+de\s+(\d{4})/i);
+                        if (m) {
+                            const day = parseInt(m[1],10);
+                            const month = monthMap[m[2]] !== undefined ? monthMap[m[2]] : 0;
+                            const year = parseInt(m[3],10);
+                            let hours = 0, minutes = 0;
+                            if (tx.time) {
+                                const t = tx.time.toString().match(/(\d{1,2}):(\d{2})/);
+                                if (t) { hours = parseInt(t[1],10); minutes = parseInt(t[2],10); }
+                            }
+                            return new Date(year, month, day, hours, minutes);
+                        }
+                    } catch (e) { /* fallthrough */ }
+                }
             } catch (e) {}
             return new Date(0);
         };
 
-        let arr = [...movimientos];
+        const getAmountFromTx = (tx) => {
+            if (!tx) return 0;
+            if (tx.monto != null) return Number(tx.monto) || 0;
+            if (tx.amount != null) return Number(tx.amount) || 0;
+            if (tx.amountLabel) {
+                const n = (''+tx.amountLabel).replace(/[^0-9.-]/g,'');
+                return Number(n) || 0;
+            }
+            return 0;
+        };
+
+        const deriveTag = (tx) => {
+            if (!tx) return '';
+            if (tx.tag) return String(tx.tag).toLowerCase();
+            // if metadata indicates direction, use it
+            try {
+                let meta = tx.metadata;
+                if (meta && typeof meta === 'string') {
+                    try { meta = JSON.parse(meta); } catch (e) { }
+                }
+                if (meta && meta.direction) return String(meta.direction).toLowerCase();
+                if (meta && (meta.fromUserId || meta.toUserId || meta.fromUser || meta.toUser)) {
+                    // amount sign determines direction
+                    const amt = getAmountFromTx(tx);
+                    return amt < 0 ? 'paga' : 'recibi';
+                }
+            } catch (e) {}
+            // fallback to amount sign
+            const amt = getAmountFromTx(tx);
+            if (amt < 0) return 'paga';
+            if (amt > 0) return 'recibi';
+            return '';
+        };
+
+        let arr = (movimientos || []).slice().map(m => ({
+            __orig: m,
+            __dateObj: parseDateFromTx(m),
+            __amount: getAmountFromTx(m),
+            __tag: deriveTag(m),
+        }));
 
         // Apply type filters first (if any selected)
         if (filters.tipoPago || filters.tipoRecibido) {
-            arr = arr.filter(m => {
-                const tag = (m.tag || '').toLowerCase();
-                const isPago = tag.includes('paga') || tag.includes('pagaste');
-                const isRecibido = tag.includes('recibi') || tag.includes('recibiste');
+            arr = arr.filter(item => {
+                const isPago = (item.__tag || '').includes('paga') || (item.__amount < 0);
+                const isRecibido = (item.__tag || '').includes('recib') || (item.__amount > 0);
                 return (filters.tipoPago && isPago) || (filters.tipoRecibido && isRecibido);
             });
         }
 
         // Apply sorting
         if (sortType === 'fechaReciente') {
-            arr.sort((a, b) => parseSpanishDateTime(b.date, b.time) - parseSpanishDateTime(a.date, a.time));
+            arr.sort((a,b) => b.__dateObj - a.__dateObj);
         } else if (sortType === 'fechaAntigua') {
-            arr.sort((a, b) => parseSpanishDateTime(a.date, a.time) - parseSpanishDateTime(b.date, b.time));
+            arr.sort((a,b) => a.__dateObj - b.__dateObj);
         } else if (sortType === 'montoMenor') {
-            arr.sort((a, b) => parseFloat(a.amount.replace(/[^\d.]/g, '')) - parseFloat(b.amount.replace(/[^\d.]/g, '')));
+            arr.sort((a,b) => a.__amount - b.__amount);
         } else if (sortType === 'montoMayor') {
-            arr.sort((a, b) => parseFloat(b.amount.replace(/[^\d.]/g, '')) - parseFloat(a.amount.replace(/[^\d.]/g, '')));
+            arr.sort((a,b) => b.__amount - a.__amount);
         }
 
-        return arr;
+        // Return original-shaped transactions in the requested order
+        return arr.map(i => i.__orig);
 
     };
 
-    // CRUD Operations for Monthly Budgets
-    const handleAddMonthlyBudget = () => {
-        if (!newMonthlyCategory.trim() || !newMonthlyLimit.trim()) return;
-        
-        const id = `mb${Date.now()}`;
+    // CRUD Operations for Monthly Budgets (persist to DatabaseService when possible)
+    const handleSaveBudget = async () => {
+        // Basic presence checks
+        if (!newMonthlyCategory || !newMonthlyCategory.trim()) {
+            Alert.alert('Datos incompletos', 'Ingresa el concepto del presupuesto');
+            return;
+        }
+        const parsedLimit = Number(newMonthlyLimit);
+        const parsedSpent = Number(newMonthlySpent);
+        if (isNaN(parsedLimit) || parsedLimit <= 0) {
+            Alert.alert('Límite inválido', 'Ingresa un límite numérico mayor que 0');
+            return;
+        }
+        if (isNaN(parsedSpent) || parsedSpent < 0) {
+            Alert.alert('Gastado inválido', 'Ingresa un valor numérico válido para "Gastado hasta ahora" (>= 0)');
+            return;
+        }
+        // Gastado no puede ser igual o mayor que el límite
+        if (parsedSpent >= parsedLimit) {
+            Alert.alert('Valor inválido', 'El valor "Gastado hasta ahora" no puede ser igual o mayor que el límite');
+            return;
+        }
+        // Si hay usuario con saldo, no permitir límite mayor al saldo disponible
+        if (user && typeof saldo === 'number' && parsedLimit > saldo) {
+            Alert.alert('Límite mayor que saldo', 'El límite del presupuesto no puede ser mayor que tu saldo disponible');
+            return;
+        }
+
         const currentMonth = new Date().getMonth() + 1;
         const currentYear = new Date().getFullYear();
-        
-        setMonthlyBudgets(prev => [{ 
-            id, 
-            concept: newMonthlyCategory.trim(), 
-            limit: newMonthlyLimit.trim(), 
-            spent: newMonthlySpent || '0.00',
-            month: currentMonth,
-            year: currentYear
-        }, ...prev]);
-        
-        setNewMonthlyCategory('');
-        setNewMonthlyLimit('');
-        setNewMonthlySpent('0.00');
-        setEditingMonthlyId(null);
-        setMonthlyModalVisible(false);
+        const payload = {
+            nombre: newMonthlyCategory.trim(),
+            limite: parsedLimit,
+            gastado: parsedSpent,
+            mes: currentMonth,
+            anio: currentYear,
+            fechaCreacion: new Date().toISOString(),
+        };
+        try {
+            if (!user) {
+                // operate on local state if no logged user
+                const id = editingMonthlyId || `mb${Date.now()}`;
+                setMonthlyBudgets(prev => {
+                    if (editingMonthlyId) return prev.map(mb => mb.id === editingMonthlyId ? { ...mb, concept: payload.nombre, limit: String(payload.limite), spent: String(payload.gastado) } : mb);
+                    return [{ id, concept: payload.nombre, limit: String(payload.limite), spent: String(payload.gastado), month: payload.mes, year: payload.anio }, ...prev];
+                });
+            } else {
+                if (editingMonthlyId) {
+                    try {
+                        const updated = await DatabaseService.updateBudget(editingMonthlyId, { nombre: payload.nombre, limite: payload.limite, gastado: payload.gastado });
+                        if (!updated) throw new Error('No se pudo actualizar el presupuesto');
+                        // si excede, enviar notificación
+                        try {
+                            const lim = Number((updated && (updated.limite != null ? updated.limite : payload.limite)) || payload.limite || 0);
+                            const spent = Number((updated && (updated.gastado != null ? updated.gastado : payload.gastado)) || payload.gastado || 0);
+                            if (spent > lim) {
+                                const excede = spent - lim;
+                                const subj = 'Presupuesto excedido';
+                                const body = `El presupuesto "${updated.nombre || payload.nombre}" ha sido excedido por $${excede.toFixed(2)}. Límite: $${lim.toFixed(2)}, Gastado: $${spent.toFixed(2)}.`;
+                                await DatabaseService.addMail(user.id, { subject: subj, body, is_read: 0 }).catch(() => {});
+                            }
+                        } catch (e) { console.warn('[StatusScreen] notificar presupuesto excedido error', e); }
+                    } catch (e) {
+                        console.warn('[StatusScreen] updateBudget error', e);
+                        const msg = (e && e.message) ? e.message : 'No fue posible actualizar el presupuesto';
+                        Alert.alert('Error', msg);
+                    }
+                } else {
+                    try {
+                        const created = await DatabaseService.addBudget(user.id, payload);
+                        // si el presupuesto inicial ya excede (posible si gastado enviado > limite), notificar
+                        try {
+                            const lim = Number(created && created.limite || payload.limite || 0);
+                            const spent = Number(created && created.gastado || payload.gastado || 0);
+                            if (spent > lim) {
+                                const excede = spent - lim;
+                                const subj = 'Presupuesto excedido';
+                                const body = `El presupuesto "${created.nombre || payload.nombre}" ha sido creado y excede el límite por $${excede.toFixed(2)}. Límite: $${lim.toFixed(2)}, Gastado: $${spent.toFixed(2)}.`;
+                                await DatabaseService.addMail(user.id, { subject: subj, body, is_read: 0 }).catch(() => {});
+                            }
+                        } catch (e) { console.warn('[StatusScreen] notificar presupuesto excedido error', e); }
+                    } catch (e) { console.warn('[StatusScreen] addBudget error', e); }
+                }
+                await loadData();
+            }
+            setNewMonthlyCategory('');
+            setNewMonthlyLimit('');
+            setNewMonthlySpent('0.00');
+            setEditingMonthlyId(null);
+            setMonthlyModalVisible(false);
+        } catch (e) {
+            console.warn('[StatusScreen] save budget error', e);
+            Alert.alert('Error', 'No fue posible guardar el presupuesto');
+        }
+    };
+
+    const handleDeleteBudget = async () => {
+        if (!editingMonthlyId) {
+            setMonthlyModalVisible(false);
+            return;
+        }
+        try {
+            if (!user) {
+                setMonthlyBudgets(prev => prev.filter(mb => mb.id !== editingMonthlyId));
+            } else {
+                await DatabaseService.deleteBudget(editingMonthlyId);
+                await loadData();
+            }
+            setEditingMonthlyId(null);
+            setMonthlyModalVisible(false);
+        } catch (e) {
+            console.warn('[StatusScreen] delete budget error', e);
+            Alert.alert('Error', 'No fue posible eliminar el presupuesto');
+        }
     };
 
 
@@ -131,6 +262,34 @@ export default function StatusScreen({ navigation }) {
         if (percentage <= 50) return '#36d36c';
         if (percentage <= 80) return '#ffbe54';
         return '#d9534f';
+    };
+
+    const normalizeBudget = (b) => {
+        if (!b) return null;
+        const id = b.id || b._id || b.rowid || b.ID || null;
+        const concept = b.concept || b.nombre || b.name || b.category || '';
+        const limitRaw = (b.limit != null ? b.limit : (b.limite != null ? b.limite : (b.limit == 0 ? 0 : '0')));
+        const spentRaw = (b.spent != null ? b.spent : (b.gastado != null ? b.gastado : 0));
+        const limit = Number(limitRaw) || parseFloat(limitRaw) || 0;
+        const spent = Number(spentRaw) || parseFloat(spentRaw) || 0;
+        const month = b.month || b.mes || (new Date().getMonth() + 1);
+        const year = b.year || b.anio || new Date().getFullYear();
+        if (!id) return {
+            id: `${concept}-${year}-${month}`,
+            concept,
+            limit,
+            spent,
+            month,
+            year,
+        };
+        return {
+            id,
+            concept,
+            limit,
+            spent,
+            month,
+            year,
+        };
     };
 
     // Get filtered + sorted monthly budgets according to search, risk filters and sort type
@@ -163,6 +322,47 @@ export default function StatusScreen({ navigation }) {
         return arr;
     };
 
+    const loadData = async () => {
+        setLoading(true);
+        try {
+            await usuarioController.initialize();
+            const u = await usuarioController.getCurrentUser();
+            setUser(u);
+            if (!u) {
+                setMovimientos([]);
+                setMonthlyBudgets([]);
+                setSaldo(0);
+                setUsersList([]);
+                setLoading(false);
+                return;
+            }
+            // load transactions
+            const txs = await DatabaseService.getTransactions(u.id, { limit: 1000 }).catch(() => []);
+            const tlist = Array.isArray(txs) ? txs : [];
+            setMovimientos(tlist);
+            // compute saldo
+            const sum = (tlist || []).reduce((s, t) => s + (Number(t.monto) || 0), 0);
+            setSaldo(sum);
+            // load budgets
+            const buds = await DatabaseService.getBudgets(u.id).catch(() => []);
+            const mapped = (Array.isArray(buds) ? buds : []).map(b => normalizeBudget(b)).filter(x => x);
+            setMonthlyBudgets(mapped);
+            // load users for counterparty resolution
+            const allUsers = await DatabaseService.getAll().catch(() => []);
+            setUsersList(Array.isArray(allUsers) ? allUsers : []);
+        } catch (e) {
+            console.warn('[StatusScreen] loadData error', e);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    useFocusEffect(
+        React.useCallback(() => {
+            loadData();
+        }, [])
+    );
+
     return (
     <ScrollView
         contentContainerStyle={styles.containerMain}
@@ -179,7 +379,7 @@ export default function StatusScreen({ navigation }) {
                 <View style={styles.dataContainer}>
                     <Text style={styles.titleTag}> Saldo Disponible</Text>
 
-                    <Text style={styles.titleMoney}>$ 25,000.75</Text>
+                    <Text style={styles.titleMoney}>$ {typeof saldo === 'number' ? saldo.toFixed(2) : '0.00'}</Text>
                     <TouchableOpacity 
                         style={styles.botonTransacciones}
                         onPress={() => navigation.navigate('Transacciones')}
@@ -257,27 +457,51 @@ export default function StatusScreen({ navigation }) {
                         showsHorizontalScrollIndicator={false}
                         style={styles.movimientosScroll}
                     >
-
-                        {getOrderedMovimientos().map(m => (
-                            <TouchableOpacity
-                                key={m.id}
-                                style={styles.movimientoDatoContainer}
-                                onPress={() => {
-                                    setEditingMovimiento(m);
-                                    setMovimientoModalVisible(true);
-                                }}
-                            >
-                                <View style={{flex: 1}}>
-                                    <Text style={styles.movimientoTag}>{m.title}</Text>
-                                    <Text style={styles.tag}> {m.tag} </Text>
-                                    <Text style={styles.movimientoFecha}>{m.date} - {m.time}</Text>
+                        {(() => {
+                            const ordered = getOrderedMovimientos();
+                            if (!ordered || ordered.length === 0) return (
+                                <View style={{ padding: 12, alignItems: 'center' }}>
+                                    <Text style={{ color: '#888' }}>No hay movimientos registrados.</Text>
                                 </View>
-                                <View style={styles.tipoMovimientoContainer}>
-                                    <Text style={styles.money}>{m.amount}</Text>
-                                </View>
-                            </TouchableOpacity>
-                        ))}
-                        
+                            );
+                            return ordered.map(tx => {
+                                const montoNum = Number(tx.monto) || 0;
+                                const isReceived = montoNum > 0;
+                                // resolve counterparty from metadata
+                                let counterparty = '';
+                                try {
+                                    let meta = tx.metadata;
+                                    if (meta && typeof meta === 'string') {
+                                        try { meta = JSON.parse(meta); } catch (e) { }
+                                    }
+                                    const cpId = meta && (meta.fromUserId || meta.toUserId || meta.fromUser || meta.toUser);
+                                    if (cpId) {
+                                        const found = (usersList || []).find(u => String(u.id) === String(cpId));
+                                        if (found) counterparty = found.nombre || found.correo || found.cuenta || '';
+                                    }
+                                } catch (e) {}
+                                const title = isReceived ? `Recibido${counterparty ? ' de ' + counterparty : ''}` : `Enviado${counterparty ? ' a ' + counterparty : ''}`;
+                                const dateLabel = tx.fecha ? new Date(tx.fecha).toLocaleString() : '';
+                                const amountLabel = `$ ${Math.abs(montoNum).toFixed(2)}`;
+                                const key = tx.id || `${tx.fecha}_${montoNum}`;
+                                return (
+                                    <TouchableOpacity
+                                        key={key}
+                                        style={styles.movimientoDatoContainer}
+                                        onPress={() => { setEditingMovimiento(tx); setMovimientoModalVisible(true); }}
+                                    >
+                                        <View style={{flex: 1}}>
+                                            <Text style={styles.movimientoTag}>{title}</Text>
+                                            <Text style={styles.tag}>{tx.concepto || tx.concept || ''}</Text>
+                                            <Text style={styles.movimientoFecha}>{dateLabel}</Text>
+                                        </View>
+                                        <View style={styles.tipoMovimientoContainer}>
+                                            <Text style={[styles.money, { color: montoNum < 0 ? '#d9534f' : '#36d36c' }]}>{isReceived ? `+ ${amountLabel}` : `- ${amountLabel}`}</Text>
+                                        </View>
+                                    </TouchableOpacity>
+                                );
+                            })
+                        })()}
                     </ScrollView>
 
                     {/* Modal de información de movimiento */}
@@ -290,20 +514,20 @@ export default function StatusScreen({ navigation }) {
                         >
                             <View style={styles.modalOverlay}>
                                 <View style={styles.modalContainer}>
-                                    <Text style={styles.titleTag}>{editingMovimiento.tag}</Text>
-                                    <View style={styles.modalInfoSection}>
-                                        <Text style={styles.modalInputLabel}>Título:</Text>
-                                        <Text style={styles.modalInputValue}>{editingMovimiento.title}</Text>
+                                        <Text style={styles.titleTag}>{editingMovimiento.tag || editingMovimiento.tipo || 'Movimiento'}</Text>
+                                        <View style={styles.modalInfoSection}>
+                                            <Text style={styles.modalInputLabel}>Título / Concepto:</Text>
+                                            <Text style={styles.modalInputValue}>{editingMovimiento.concepto || editingMovimiento.title || editingMovimiento.concept || ''}</Text>
                                         
-                                        <Text style={styles.modalInputLabel}>Monto:</Text>
-                                        <Text style={styles.modalInputValue}>{editingMovimiento.amount}</Text>
+                                            <Text style={styles.modalInputLabel}>Monto:</Text>
+                                            <Text style={styles.modalInputValue}>{editingMovimiento.monto != null ? `$ ${Number(editingMovimiento.monto).toFixed(2)}` : (editingMovimiento.amount || '')}</Text>
                                         
-                                        <Text style={styles.modalInputLabel}>Fecha:</Text>
-                                        <Text style={styles.modalInputValue}>{editingMovimiento.date}</Text>
+                                            <Text style={styles.modalInputLabel}>Fecha:</Text>
+                                            <Text style={styles.modalInputValue}>{editingMovimiento.fecha ? new Date(editingMovimiento.fecha).toLocaleDateString() : (editingMovimiento.date || '')}</Text>
                                         
-                                        <Text style={styles.modalInputLabel}>Hora:</Text>
-                                        <Text style={styles.modalInputValue}>{editingMovimiento.time}</Text>
-                                    </View>
+                                            <Text style={styles.modalInputLabel}>Hora:</Text>
+                                            <Text style={styles.modalInputValue}>{editingMovimiento.fecha ? new Date(editingMovimiento.fecha).toLocaleTimeString() : (editingMovimiento.time || '')}</Text>
+                                        </View>
                                     <View>
                                         <TouchableOpacity
                                             style={[styles.modalButton]}
@@ -419,7 +643,14 @@ export default function StatusScreen({ navigation }) {
                         showsVerticalScrollIndicator={false}
                     >
                         <View style={styles.monthlyBudgetRow}>
-                            {getFilteredMonthlyBudgets().map(mb => {
+                            {(() => {
+                                const list = getFilteredMonthlyBudgets();
+                                if (!list || list.length === 0) return (
+                                    <View style={{ padding: 12, alignItems: 'center', width: '100%' }}>
+                                        <Text style={{ color: '#888' }}>No hay presupuestos mensuales registrados.</Text>
+                                    </View>
+                                );
+                                return list.map(mb => {
                                 const percentage = getPercentageSpent(mb.spent, mb.limit);
                                 const progressColor = getProgressColor(percentage);
                                 return (
@@ -429,9 +660,15 @@ export default function StatusScreen({ navigation }) {
                                         activeOpacity={0.8}
                                         onPress={() => {
                                             setEditingMonthlyId(mb.id);
-                                            setNewMonthlyCategory(mb.concept);
-                                            setNewMonthlyLimit(mb.limit);
-                                            setNewMonthlySpent(mb.spent);
+                                                setNewMonthlyCategory(mb.concept || '');
+                                                try {
+                                                    const limVal = (mb.limit != null && !isNaN(Number(mb.limit))) ? Number(mb.limit).toFixed(2) : '';
+                                                    setNewMonthlyLimit(limVal);
+                                                } catch (e) { setNewMonthlyLimit(mb.limit != null ? String(mb.limit) : ''); }
+                                                try {
+                                                    const spentVal = (mb.spent != null && !isNaN(Number(mb.spent))) ? Number(mb.spent).toFixed(2) : '0.00';
+                                                    setNewMonthlySpent(spentVal);
+                                                } catch (e) { setNewMonthlySpent(mb.spent != null ? String(mb.spent) : '0.00'); }
                                             setMonthlyModalVisible(true);
                                         }}
                                     >
@@ -452,7 +689,8 @@ export default function StatusScreen({ navigation }) {
                                         </View>
                                     </TouchableOpacity>
                                 );
-                            })}
+                                });
+                            })()}
                         </View>
                     </ScrollView>
 
@@ -496,30 +734,14 @@ export default function StatusScreen({ navigation }) {
                                     <View style={styles.modalButtonsRow}>
                                         <TouchableOpacity
                                             style={[styles.modalButton, {backgroundColor: '#0a57d9'}]}
-                                            onPress={() => {
-                                                if (editingMonthlyId) {
-                                                    setMonthlyBudgets(prev => prev.map(mb => mb.id === editingMonthlyId ? {
-                                                        ...mb,
-                                                        concept: newMonthlyCategory,
-                                                        limit: newMonthlyLimit,
-                                                        spent: newMonthlySpent
-                                                    } : mb));
-                                                } else {
-                                                    handleAddMonthlyBudget();
-                                                }
-                                                setMonthlyModalVisible(false);
-                                            }}
+                                            onPress={() => { handleSaveBudget(); }}
                                         >
                                             <Text style={styles.modalButtonText}>{editingMonthlyId ? 'Actualizar' : 'Guardar'}</Text>
                                         </TouchableOpacity>
                                         {editingMonthlyId && (
                                             <TouchableOpacity
                                                 style={[styles.modalButton, {backgroundColor: '#d9534f'}]}
-                                                onPress={() => {
-                                                    setMonthlyBudgets(prev => prev.filter(mb => mb.id !== editingMonthlyId));
-                                                    setMonthlyModalVisible(false);
-                                                    setEditingMonthlyId(null);
-                                                }}
+                                                onPress={() => { handleDeleteBudget(); }}
                                             >
                                                 <Text style={styles.modalButtonText}>Eliminar</Text>
                                             </TouchableOpacity>

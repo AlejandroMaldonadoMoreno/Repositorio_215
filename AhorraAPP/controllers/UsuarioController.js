@@ -41,6 +41,39 @@ export class UsuarioController {
                 userObj.cuenta = Usuario.generarNumeroCuenta();
             }
 
+            // 1.b Validar unicidad de campos (correo, telefono, cuenta)
+            try {
+                const usuarios = await DatabaseService.getAll();
+                if (userObj.correo) {
+                    const exists = usuarios.find(u => (u.correo || '').toLowerCase() === (userObj.correo || '').toLowerCase());
+                    if (exists) {
+                        const err = new Error('Validation error: correo en uso');
+                        err.userMessage = 'El correo proporcionado ya está en uso';
+                        throw err;
+                    }
+                }
+                if (userObj.telefono) {
+                    const existsTel = usuarios.find(u => (u.telefono || '') === (userObj.telefono || ''));
+                    if (existsTel) {
+                        const err = new Error('Validation error: telefono en uso');
+                        err.userMessage = 'El número de teléfono ya está en uso';
+                        throw err;
+                    }
+                }
+                if (userObj.cuenta) {
+                    const existsCuenta = usuarios.find(u => (u.cuenta || '') === (userObj.cuenta || ''));
+                    if (existsCuenta) {
+                        const err = new Error('Validation error: cuenta en uso');
+                        err.userMessage = 'El número de cuenta ya está en uso';
+                        throw err;
+                    }
+                }
+            } catch (uniqErr) {
+                // si uniqErr es nuestro Error, propagarlo; si es otro error al leer usuarios, continuar y dejar que DB maneje duplicados
+                if (uniqErr && uniqErr.message && /ya está en uso/.test(uniqErr.message)) throw uniqErr;
+                // otherwise log and continue
+                console.warn('[UsuarioController] crearUsuario: unicidad no pudo validarse', uniqErr);
+            }
             //2. Insertar en BD
             console.log('[UsuarioController] crearUsuario: creando usuario con correo=', userObj && userObj.correo);
             const nuevoUsuario = await DatabaseService.add(userObj);
@@ -48,6 +81,30 @@ export class UsuarioController {
 
             //3. Notificar a los observadores
             this.notifyListeners();
+            // 3.b Añadir mail de bienvenida al buzón del usuario
+            try {
+                if (DatabaseService && typeof DatabaseService.addMail === 'function') {
+                    const subject = 'Bienvenido a AhorraAPP';
+                    const body = `Hola ${nuevoUsuario.nombre || ''},\n\nBienvenido a AhorraAPP. Tu cuenta ha sido creada correctamente. Tu número de cuenta es: ${nuevoUsuario.cuenta || ''}.\n\nGracias por confiar en nosotros.`;
+                    await DatabaseService.addMail(nuevoUsuario.id, { subject, body, is_read: 0 });
+                    console.log('[UsuarioController] crearUsuario: mail de bienvenida añadido para user=', nuevoUsuario.id);
+                }
+            } catch (e) {
+                console.warn('[UsuarioController] crearUsuario: error añadiendo mail de bienvenida', e);
+            }
+            // 3.c Añadir transacción inicial para pruebas (saldo inicial de 1000)
+            try {
+                if (DatabaseService && typeof DatabaseService.addTransaction === 'function') {
+                    await DatabaseService.addTransaction(nuevoUsuario.id, { tipo: 'initial', concepto: 'Saldo inicial', monto: 1000, fecha: new Date().toISOString(), metadata: { reason: 'saldo_inicial' } });
+                    // notificar al usuario que recibió el saldo inicial
+                    const subjInit = 'Saldo inicial acreditado';
+                    const bodyInit = `Se han acreditado $1000 en tu cuenta (${nuevoUsuario.cuenta || ''}) como saldo inicial para pruebas.`;
+                    await DatabaseService.addMail(nuevoUsuario.id, { subject: subjInit, body: bodyInit, is_read: 0 });
+                    console.log('[UsuarioController] crearUsuario: saldo inicial y mail añadidos para user=', nuevoUsuario.id);
+                }
+            } catch (e) {
+                console.warn('[UsuarioController] crearUsuario: error añadiendo transacción inicial', e);
+            }
             // Do NOT persist the created user as the active session automatically.
             // The user must explicitly log in to become the active user.
             this.currentUser = null;
@@ -64,6 +121,11 @@ export class UsuarioController {
                 nuevoUsuario.fechaCreacion
             );
         } catch (error) {
+            // If this is a validation error intended for the user, don't print stacktrace to console
+            if (error && error.userMessage) {
+                // rethrow so UI can show friendly message
+                throw error;
+            }
             console.error('Error al crear usuario:', error);
             throw error;
         }
@@ -190,10 +252,78 @@ export class UsuarioController {
                 }
             }
 
-            // 3) Finally, if nothing persisted, return in-memory currentUser (if any)
+            // 3) Try to auto-detect a likely user when no persisted meta is available.
+            try {
+                const usuarios = await DatabaseService.getAll().catch(() => []);
+                // If only one user exists, assume it's the active one and persist it
+                if (Array.isArray(usuarios) && usuarios.length === 1) {
+                    const only = usuarios[0];
+                    console.log('[UsuarioController] getCurrentUser: single user fallback ->', only && only.correo);
+                    this.currentUser = only;
+                    // persist recovered correo to AsyncStorage / DB meta if possible
+                    try {
+                        const mod = await import('@react-native-async-storage/async-storage').catch(() => null);
+                        const AsyncStorage = mod ? (mod.default || mod) : null;
+                        if (AsyncStorage && only && only.correo) {
+                            await AsyncStorage.setItem('currentUserCorreo', only.correo);
+                            console.log('[UsuarioController] getCurrentUser: persisted currentUserCorreo to AsyncStorage=', only.correo);
+                        }
+                    } catch (e) { /* ignore */ }
+                    try { if (DatabaseService && DatabaseService.setMeta && only && only.correo) await DatabaseService.setMeta('currentUserCorreo', only.correo); } catch (e) { /* ignore */ }
+                    return new Usuario(only.id, only.nombre, only.apellidos, only.telefono, only.correo, only.passwordHash || only.password, only.cuenta, only.fechaCreacion);
+                }
+
+                // If there are several users, attempt to find the one with recent activity (transactions or mails)
+                if (Array.isArray(usuarios) && usuarios.length > 1) {
+                    for (const u of usuarios) {
+                        try {
+                            const txs = await DatabaseService.getTransactions(u.id, { limit: 1 }).catch(() => []);
+                            if (Array.isArray(txs) && txs.length > 0) {
+                                console.log('[UsuarioController] getCurrentUser: recovered user by recent transactions ->', u.correo);
+                                this.currentUser = u;
+                                try { if (DatabaseService && DatabaseService.setMeta && u && u.correo) await DatabaseService.setMeta('currentUserCorreo', u.correo); } catch (e) {}
+                                try {
+                                    const mod = await import('@react-native-async-storage/async-storage').catch(() => null);
+                                    const AsyncStorage = mod ? (mod.default || mod) : null;
+                                    if (AsyncStorage && u && u.correo) await AsyncStorage.setItem('currentUserCorreo', u.correo);
+                                } catch (e) {}
+                                return new Usuario(u.id, u.nombre, u.apellidos, u.telefono, u.correo, u.passwordHash || u.password, u.cuenta, u.fechaCreacion);
+                            }
+                        } catch (e) { /* ignore per-user errors */ }
+                    }
+                    // if not found by txs, try mails
+                    for (const u of usuarios) {
+                        try {
+                            const mails = await DatabaseService.getMails(u.id, { limit: 1 }).catch(() => []);
+                            if (Array.isArray(mails) && mails.length > 0) {
+                                console.log('[UsuarioController] getCurrentUser: recovered user by mails ->', u.correo);
+                                this.currentUser = u;
+                                try { if (DatabaseService && DatabaseService.setMeta && u && u.correo) await DatabaseService.setMeta('currentUserCorreo', u.correo); } catch (e) {}
+                                try {
+                                    const mod = await import('@react-native-async-storage/async-storage').catch(() => null);
+                                    const AsyncStorage = mod ? (mod.default || mod) : null;
+                                    if (AsyncStorage && u && u.correo) await AsyncStorage.setItem('currentUserCorreo', u.correo);
+                                } catch (e) {}
+                                return new Usuario(u.id, u.nombre, u.apellidos, u.telefono, u.correo, u.passwordHash || u.password, u.cuenta, u.fechaCreacion);
+                            }
+                        } catch (e) { /* ignore */ }
+                    }
+                }
+
+            } catch (e) {
+                console.warn('[UsuarioController] getCurrentUser: auto-detect fallback failed', e);
+            }
+
+            // 4) Finally, if nothing persisted, return in-memory currentUser (if any) and attempt to re-persist it so future loads succeed
             if (this.currentUser) {
                 const f = this.currentUser;
-                console.log('[UsuarioController] getCurrentUser: returning in-memory user=', f && f.correo);
+                console.log('[UsuarioController] getCurrentUser: returning in-memory user=', f && f.correo, 'and attempting to persist it');
+                try {
+                    const mod = await import('@react-native-async-storage/async-storage').catch(() => null);
+                    const AsyncStorage = mod ? (mod.default || mod) : null;
+                    if (AsyncStorage && f && f.correo) await AsyncStorage.setItem('currentUserCorreo', f.correo);
+                } catch (e) { console.warn('[UsuarioController] getCurrentUser: AsyncStorage re-persist failed', e); }
+                try { if (DatabaseService && DatabaseService.setMeta && f && f.correo) await DatabaseService.setMeta('currentUserCorreo', f.correo); } catch (e) { console.warn('[UsuarioController] getCurrentUser: DB meta re-persist failed', e); }
                 return new Usuario(
                     f.id,
                     f.nombre,
