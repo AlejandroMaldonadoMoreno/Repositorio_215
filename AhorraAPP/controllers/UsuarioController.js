@@ -5,11 +5,17 @@ import DatabaseService from '../database/DataBaseService';
 export class UsuarioController {
     constructor() {
         this.listeners = [];
+        this._initialized = false; // Track if initialize() has completed
     }
 
     //Inicializar el controlador con el Service
     async initialize() {
+        // Prevent redundant initialization
+        if (this._initialized) {
+            return;
+        }
         await DatabaseService.initialize();
+        this._initialized = true;
         // NotificationService initialization removed per user request
     }
 

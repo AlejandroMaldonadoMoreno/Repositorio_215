@@ -528,9 +528,18 @@ export default function StatusScreen({ navigation }) {
                                             <Text style={styles.modalInputLabel}>Hora:</Text>
                                             <Text style={styles.modalInputValue}>{editingMovimiento.fecha ? new Date(editingMovimiento.fecha).toLocaleTimeString() : (editingMovimiento.time || '')}</Text>
                                         </View>
-                                    <View>
+                                    <View style={{flexDirection: 'row', gap: 10}}>
                                         <TouchableOpacity
-                                            style={[styles.modalButton]}
+                                            style={[styles.modalButton, {flex: 1, backgroundColor: '#0A84FF'}]}
+                                            onPress={() => {
+                                                setMovimientoModalVisible(false);
+                                                navigation.navigate('Actualizar', { movimiento: editingMovimiento });
+                                            }}
+                                        >
+                                            <Text style={styles.modalButtonText}>Actualizar</Text>
+                                        </TouchableOpacity>
+                                        <TouchableOpacity
+                                            style={[styles.modalButton, {flex: 1}]}
                                             onPress={() => setMovimientoModalVisible(false)}
                                         >
                                             <Text style={styles.modalButtonText}>Cerrar</Text>

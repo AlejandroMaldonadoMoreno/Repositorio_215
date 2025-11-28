@@ -8,13 +8,31 @@ class DatabaseService {
         this.useFallback = false;
         this._metaCache = {};
         this._fallbackStore = {}; // in-memory fallback for small test data when AsyncStorage/localStorage missing
+        this._initialized = false; // Track if initialize() has been called
+        this._initializing = false; // Prevent concurrent initialization
     }
 
     async initialize() {
-        if (Platform.OS === 'web') {
-            console.log("Usando LocalStorage para web");
-            this.useFallback = true;
-        } else {
+        // Prevent re-initialization or concurrent initialization
+        if (this._initialized || this._initializing) {
+            return;
+        }
+        this._initializing = true;
+        
+        try {
+            if (Platform.OS === 'web') {
+                console.log("Usando LocalStorage para web");
+                this.useFallback = true;
+                this._initialized = true;
+                return;
+            }
+            
+            // If already using fallback, don't try SQLite again
+            if (this.useFallback) {
+                console.log('[DataBaseService] Already using fallback storage');
+                this._initialized = true;
+                return;
+            }
             console.log("Usando SQLite para móvil");
             try {
                     // Try to open DB; retry a few times if a transient native error occurs
@@ -39,6 +57,15 @@ class DatabaseService {
                         // stop further native initialization since DB is not available
                         return;
                     }
+                    
+                    // Verify db is ready before executing commands
+                    if (!this.db || typeof this.db.execAsync !== 'function') {
+                        console.warn('[DataBaseService] DB object is not properly initialized, switching to fallback');
+                        this.useFallback = true;
+                        this.db = null;
+                        return;
+                    }
+                    
                     await this.db.execAsync(`
                 CREATE TABLE IF NOT EXISTS usuarios (
                         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -164,53 +191,55 @@ class DatabaseService {
                 this.useFallback = true;
                 this.db = null;
             }
+        } finally {
+            this._initialized = true;
+            this._initializing = false;
         }
     }
 
     // Internal helper: attempt a native runAsync with a single retry and reopen DB if needed.
     async _safeRun(sql, params = []) {
-        // If DB is not available, switch to fallback and return a safe result for inserts
-        if (!this.db) {
-            this.useFallback = true;
+        // If already using fallback or DB not available, return immediately
+        if (this.useFallback || !this.db || typeof this.db.runAsync !== 'function') {
+            if (!this.useFallback) {
+                this.useFallback = true;
+                this.db = null;
+                console.warn('[DataBaseService] Switching to fallback (DB not available in _safeRun)');
+            }
             return { insertId: Date.now(), lastInsertRowId: Date.now() };
         }
 
         try {
             return await this.db.runAsync(sql, params);
         } catch (e) {
-            console.warn('[DataBaseService] _safeRun native error, attempting reopen/retry', e);
-            try {
-                // attempt to re-open DB once
-                this.db = await SQLite.openDatabaseAsync('AhorraApp.db');
-                return await this.db.runAsync(sql, params);
-            } catch (e2) {
-                console.warn('[DataBaseService] _safeRun retry failed, switching to fallback', e2);
-                this.useFallback = true;
-                // Return synthetic insert-like result so callers can continue using fallback storage
-                return { insertId: Date.now(), lastInsertRowId: Date.now() };
-            }
+            console.warn('[DataBaseService] _safeRun native error, switching permanently to fallback', e);
+            // Don't retry - immediately switch to fallback to avoid state thrashing
+            this.useFallback = true;
+            this.db = null;
+            return { insertId: Date.now(), lastInsertRowId: Date.now() };
         }
     }
 
     // Internal helper: attempt a native getAllAsync with a single retry and reopen DB if needed.
     async _safeGetAll(sql, params = []) {
-        if (!this.db) {
-            this.useFallback = true;
+        // If already using fallback or DB not available, return immediately
+        if (this.useFallback || !this.db || typeof this.db.getAllAsync !== 'function') {
+            if (!this.useFallback) {
+                this.useFallback = true;
+                this.db = null;
+                console.warn('[DataBaseService] Switching to fallback (DB not available in _safeGetAll)');
+            }
             return [];
         }
 
         try {
             return await this.db.getAllAsync(sql, params);
         } catch (e) {
-            console.warn('[DataBaseService] _safeGetAll native error, attempting reopen/retry', e);
-            try {
-                this.db = await SQLite.openDatabaseAsync('AhorraApp.db');
-                return await this.db.getAllAsync(sql, params);
-            } catch (e2) {
-                console.warn('[DataBaseService] _safeGetAll retry failed, switching to fallback', e2);
-                this.useFallback = true;
-                return [];
-            }
+            console.warn('[DataBaseService] _safeGetAll native error, switching permanently to fallback', e);
+            // Don't retry - immediately switch to fallback to avoid state thrashing
+            this.useFallback = true;
+            this.db = null;
+            return [];
         }
     }
     async getAll() {
