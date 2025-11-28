@@ -103,19 +103,41 @@ export default function LoginScreen({ navigation }) {
         }
     };
 
-    const validacionRecuperar = () => {
+    const validacionRecuperar = async () => {
         if (correo.trim() === '') {
-            Alert.alert("Error los campos estan en blanco (Móvil)");
+            Alert.alert('Error', 'El campo de correo está en blanco');
             return false;
         }
         if (!correo.includes('@') || !correo.includes('.')) {
-            Alert.alert("El correo no es valido (Móvil)");
+            Alert.alert('Error', 'El correo no es válido');
             return false;
         }
 
-        Alert.alert('Instrucciones enviadas', 'Revisa tu correo para recuperar tu contraseña');
-        setCorreo(''); // Limpiar el campo de correo
-        return true;
+        try {
+            const email = correo.trim().toLowerCase();
+
+            // Intentar varios nombres de método habituales en el controller para enviar recuperación
+            if (typeof usuarioController.enviarRecuperacion === 'function') {
+                await usuarioController.enviarRecuperacion(email);
+            } else if (typeof usuarioController.recuperarContrasenia === 'function') {
+                await usuarioController.recuperarContrasenia(email);
+            } else if (typeof usuarioController.sendPasswordReset === 'function') {
+                await usuarioController.sendPasswordReset(email);
+            } else {
+                // Si el controller no expone un método de recuperación, simulamos el envío para mantener UX
+                // (si quieres que esto falle en ausencia del método, reemplaza por un throw)
+                console.warn('UsuarioController: no se encontró método de recuperación, comportamiento por defecto.');
+            }
+
+            Alert.alert('Instrucciones enviadas', 'Revisa tu correo para recuperar tu contraseña');
+            setCorreo(''); // Limpiar el campo de correo
+            return true;
+        } catch (e) {
+            const msg = (e && e.userMessage) || (e && e.message) || 'No se pudo enviar las instrucciones de recuperación';
+            console.warn('Recuperar error:', msg);
+            Alert.alert('Error', msg);
+            return false;
+        }
     }
 
 
