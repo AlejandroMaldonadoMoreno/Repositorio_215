@@ -189,6 +189,16 @@ function Principal({ onVerDetalle, navigation }) {
         }
     };
 
+    const handleDeleteNotification = async (id) => {
+        if (!user) return;
+        try {
+            await DatabaseService.deleteMail(user.id, id).catch(() => null);
+        } catch (e) {
+            console.warn('[GraficaScreen] deleteMail error', e);
+        }
+        setNotifications(prev => (Array.isArray(prev) ? prev.filter(n => String(n.id) !== String(id)) : []));
+    };
+
     const renderChartAndLegend = (inModal = false) => {
         return (
             <>
@@ -392,6 +402,9 @@ function Principal({ onVerDetalle, navigation }) {
                             keyExtractor={item => String(item.id)}
                             renderItem={({ item }) => (
                                 <View style={styles.notifItem}>
+                                    <Pressable style={styles.notifCloseButton} onPress={() => handleDeleteNotification(item.id)}>
+                                        <Text style={styles.notifCloseText}>✕</Text>
+                                    </Pressable>
                                     <Text style={styles.notifTitle}>{item.subject || item.title || 'Mensaje'}</Text>
                                     <Text style={styles.notifBody}>{item.body}</Text>
                                     <Text style={styles.notifTime}>{item.fecha ? new Date(item.fecha).toLocaleString() : ''}</Text>
@@ -697,10 +710,24 @@ const styles = StyleSheet.create({
         fontWeight: '700',
     },
     notifItem: {
+        position: 'relative',
         paddingVertical: 12,
         borderBottomWidth: 1,
         borderBottomColor: '#eee',
     },
+    notifCloseButton: {
+        position: 'absolute',
+        top: 5,
+        right: 5,
+        width: 16,
+        height: 16,
+        borderRadius: 8,
+        backgroundColor: 'rgba(0,0,0,0.06)',
+        alignItems: 'center',
+        justifyContent: 'center',
+        
+    },
+    notifCloseText: { color: '#333', fontSize: 8},
     notifTitle: {
         fontWeight: '700',
         marginBottom: 4,

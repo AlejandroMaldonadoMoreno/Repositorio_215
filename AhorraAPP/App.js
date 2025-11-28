@@ -28,11 +28,11 @@ export default function App() {
         <Stack.Screen name="Home" component={HomeScreen} />
         <Stack.Screen name="Login" component={LoginScreen} />
         <Stack.Screen name="Grafica" component={GraficaScreen} />
-        <Stack.Screen name="GraficaDetail" component={GraficaDetailScreen} options={{ title: 'Detalle de Gráfica' }} />
+        <Stack.Screen name="GraficaDetail" component={GraficaDetailScreen} />
         <Stack.Screen name="Profile" component={ProfileScreen} />
         <Stack.Screen name="Status" component={StatusScreen} />
         <Stack.Screen name="Actualizar" component={Actualizar} />
-        <Stack.Screen name="Transacciones" component={PantallaTransacciones} options={{ title: 'Transacciones' }} />
+        <Stack.Screen name="Transacciones" component={PantallaTransacciones} />
       </Stack.Navigator>
     </NavigationContainer>
   );

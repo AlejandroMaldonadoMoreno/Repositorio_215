@@ -12,6 +12,9 @@ export default function LoginScreen({ navigation }) {
     const [telefono, setTelefono] = useState('');
     const [correo, setCorreo] = useState('');
     const [contrasenia, setContrasenia] = useState('');
+    const [rpToken, setRpToken] = useState('');
+    const [rpNewPassword, setRpNewPassword] = useState('');
+    const [rpLoading, setRpLoading] = useState(false);
 
     useEffect(() => {
         (async () => {
@@ -24,8 +27,16 @@ export default function LoginScreen({ navigation }) {
     }, []);
 
     const validacionLogin = async () => {
-        if (correo.trim() === '' || contrasenia.trim() === '') {
+        if (correo.trim() === '' && contrasenia.trim() === '') {
             Alert.alert('Error', 'Los campos están en blanco');
+            return false;
+        }
+        if (correo.trim() === '') {
+            Alert.alert('Error', 'Ingresa el correo electrónico');
+            return false;
+        }
+        if (contrasenia.trim() === '') {
+            Alert.alert('Error', 'Ingresa la contraseña');
             return false;
         }
         if (!correo.includes('@') || !correo.includes('.')) {
@@ -34,23 +45,23 @@ export default function LoginScreen({ navigation }) {
         }
         try {
             const result = await usuarioController.checkCredentials(correo.trim().toLowerCase(), contrasenia);
+            if (!result || !result.status) {
+                Alert.alert('Error', 'Error verificando credenciales');
+                return false;
+            }
             if (result.status === 'not_found') {
                 Alert.alert('Error', 'El correo no está registrado');
                 return false;
             }
             if (result.status === 'wrong_password') {
-                Alert.alert('Error', 'La contraseña es incorrecta');
+                Alert.alert('Error', 'Contraseña incorrecta');
                 return false;
             }
             if (result.status === 'ok') {
-                const usuario = result.user;
-                Alert.alert('Inicio de sesión exitoso', `Bienvenido ${usuario.nombre}`);
-                setCorreo('');
-                setContrasenia('');
-                navigation.navigate('Grafica');
                 return true;
             }
-            Alert.alert('Error', 'No se pudo iniciar sesión');
+            // cualquier otro estado
+            Alert.alert('Error', 'No fue posible verificar las credenciales');
             return false;
         } catch (e) {
             console.error('Login error', e);
@@ -74,6 +85,26 @@ export default function LoginScreen({ navigation }) {
         if (!alertas) {
             Alert.alert('Error', 'Debe aceptar recibir alertas de presupuesto');
             return false;
+        }
+
+        // Validaciones de unicidad: correo y teléfono
+        try {
+            const usuarios = await usuarioController.obtenerUsuarios();
+            if (Array.isArray(usuarios) && usuarios.length > 0) {
+                const emailExists = usuarios.find(u => (u.correo || '').toLowerCase() === (correo || '').trim().toLowerCase());
+                if (emailExists) {
+                    Alert.alert('Error', 'El correo proporcionado ya está registrado');
+                    return false;
+                }
+                const telExists = usuarios.find(u => (u.telefono || '') === (telefono || '').trim());
+                if (telExists) {
+                    Alert.alert('Error', 'El número de teléfono ya está registrado');
+                    return false;
+                }
+            }
+        } catch (e) {
+            console.warn('validacionRegistro: error validando unicidad', e);
+            // si falla la comprobación, dejamos que la creación maneje duplicados para no bloquear UX
         }
 
         try {
@@ -140,6 +171,54 @@ export default function LoginScreen({ navigation }) {
         }
     }
 
+        const handleRequestToken = async () => {
+            if (correo.trim() === '') {
+                Alert.alert('Error', 'El campo de correo está en blanco');
+                return;
+            }
+            if (!correo.includes('@') || !correo.includes('.')) {
+                Alert.alert('Error', 'El correo no es válido');
+                return;
+            }
+            setRpLoading(true);
+            try {
+                await usuarioController.initialize();
+                const res = await usuarioController.enviarRecuperacion(correo.trim().toLowerCase());
+                if (res && res.devToken) {
+                    Alert.alert('Token (dev)', `Tu token: ${res.devToken}`);
+                    setRpToken(res.devToken);
+                } else {
+                    Alert.alert('Enviado', 'Se enviaron instrucciones a tu correo (revisa tu bandeja)');
+                }
+            } catch (e) {
+                const msg = (e && e.userMessage) || (e && e.message) || 'No se pudo enviar las instrucciones de recuperación';
+                Alert.alert('Error', msg);
+            } finally {
+                setRpLoading(false);
+            }
+        };
+
+        const handleResetPassword = async () => {
+            if (!rpToken || rpToken.trim() === '') { Alert.alert('Error', 'Ingresa el token'); return; }
+            if (!rpNewPassword || rpNewPassword.length < 4) { Alert.alert('Error', 'La nueva contraseña debe tener al menos 4 caracteres'); return; }
+            setRpLoading(true);
+            try {
+                await usuarioController.initialize();
+                const res = await usuarioController.resetPasswordWithToken(rpToken.trim(), rpNewPassword);
+                if (res && res.status === 'ok') {
+                    Alert.alert('Hecho', 'Contraseña restablecida correctamente');
+                    setModalVisible(null);
+                    setRpToken('');
+                    setRpNewPassword('');
+                } else {
+                    Alert.alert('Error', 'No fue posible restablecer la contraseña');
+                }
+            } catch (e) {
+                const msg = (e && e.userMessage) || (e && e.message) || 'No fue posible restablecer la contraseña';
+                Alert.alert('Error', msg);
+            } finally { setRpLoading(false); }
+        };
+
 
     return (
     <View style={styles.container}>
@@ -194,7 +273,14 @@ export default function LoginScreen({ navigation }) {
                                 onChangeText={setContrasenia}
                             />
 
-                            <Pressable style={styles.BotonInicio}  onPress={async () => { const ok = await validacionLogin(); if (ok) setModalVisible(null); }}>
+                            <Pressable style={styles.BotonInicio} onPress={async () => {
+                                const ok = await validacionLogin();
+                                if (ok) {
+                                    Alert.alert('Bienvenido', 'Has iniciado sesión correctamente', [
+                                        { text: 'OK', onPress: () => { setModalVisible(null); navigation.navigate('Grafica'); } }
+                                    ]);
+                                }
+                            }}>
                                 <Text style={styles.BotonInicioText}>Iniciar sesión</Text>
                             </Pressable>
 
@@ -212,11 +298,11 @@ export default function LoginScreen({ navigation }) {
                         <View style={styles.card3}>
                             <Text style={styles.CardText3}> ¿Perdiste tu contraseña? </Text>
                         </View>
-                        <View style={styles.contenedorBotonContra}>
-                            <Pressable style={styles.botonContra} onPress={() => setModalVisible('Recuperar') }>
-                                <Text style={styles.TextContra}> Recuperala aquí</Text>
-                            </Pressable>
-                        </View>
+                            <View style={styles.contenedorBotonContra}>
+                                <Pressable style={styles.botonContra} onPress={() => setModalVisible('Recuperar') }>
+                                    <Text style={styles.TextContra}> Recuperala aquí</Text>
+                                </Pressable>
+                            </View>
                     </ScrollView>
                 </TouchableWithoutFeedback>
             </KeyboardAvoidingView>
@@ -347,11 +433,32 @@ export default function LoginScreen({ navigation }) {
                                 onChangeText={setCorreo}
                             />
 
-                            <Pressable style={styles.BotonInicio} onPress={async () => {
-                                const ok = await validacionRecuperar();
-                                if (ok) setModalVisible(null);
-                            }}>
-                                <Text style={styles.BotonInicioText}>Enviar</Text>
+                            <Pressable style={styles.BotonInicio} onPress={handleRequestToken} disabled={rpLoading}>
+                                <Text style={styles.BotonInicioText}>{rpLoading ? 'Enviando...' : 'Solicitar token'}</Text>
+                            </Pressable>
+
+                            <View style={{ height: 12 }} />
+
+                            <Text style={styles.label}>Token recibido:</Text>
+                            <TextInput
+                                style={styles.input}
+                                placeholder="Ingresa el token"
+                                autoCapitalize="none"
+                                value={rpToken}
+                                onChangeText={setRpToken}
+                            />
+
+                            <Text style={styles.label}>Nueva contraseña:</Text>
+                            <TextInput
+                                style={styles.input}
+                                placeholder="Nueva contraseña"
+                                secureTextEntry
+                                value={rpNewPassword}
+                                onChangeText={setRpNewPassword}
+                            />
+
+                            <Pressable style={styles.BotonInicio} onPress={handleResetPassword} disabled={rpLoading}>
+                                <Text style={styles.BotonInicioText}>{rpLoading ? 'Procesando...' : 'Restablecer contraseña'}</Text>
                             </Pressable>
                         </View>
                     </ScrollView>
