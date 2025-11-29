@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect} from "react";
 import {
   View,
   Text,
@@ -10,7 +10,7 @@ import {
   Platform,
 } from "react-native";
 
-export default function ActualizarTransaccion({ route }) {
+export default function ActualizarTransaccion({ route, navigation }) {
   const [nombre, setNombre] = useState("");
   const [cuenta, setCuenta] = useState("");
   const [monto, setMonto] = useState("");
@@ -53,7 +53,14 @@ export default function ActualizarTransaccion({ route }) {
 
   return (
     <ScrollView contentContainerStyle={styles.container}>
-      <View style={styles.franjaAzul} />
+      
+      <View style={styles.franjaAzul} >
+        
+        <TouchableOpacity onPress={() => navigation.goBack()}>
+            <Text style={styles.Atras}>{"< Atrás"}</Text>
+        </TouchableOpacity>
+      
+        </View>
 
       <View style={styles.contenido}>
         <Text style={styles.titulo}>Actualizar Transacción</Text>
@@ -105,14 +112,19 @@ const styles = StyleSheet.create({
     justifyContent: "flex-start",
   },
   franjaAzul: {
-    backgroundColor: "#002359",
-    height: 230,
-    width: "100%",
     position: "absolute",
     top: 0,
     left: 0,
-    borderBottomLeftRadius: 50,
-    borderBottomRightRadius: 50,
+    width: "100%",
+    height: 250,
+    backgroundColor: "#002359",
+    borderBottomLeftRadius: 40,
+    borderBottomRightRadius: 40,
+
+    paddingTop: 30,
+    paddingLeft: 20,
+    
+      
   },
   contenido: {
     width: "90%",
@@ -162,4 +174,10 @@ const styles = StyleSheet.create({
     fontWeight: "600",
     textAlign: "center",
   },
+ 
+  Atras: {
+        color: "#0a57d9",
+        fontSize: 16,
+    },
+
 });
