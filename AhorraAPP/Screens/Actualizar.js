@@ -93,7 +93,7 @@ export default function ActualizarTransaccion() {
           <TextInput
             style={styles.input}
             placeholder="Ej. Pago de renta"
-            placeholderTextColor="#aaa"
+            placeholderTextColor="#b9b9b9ff"
             value={concepto}
             onChangeText={setConcepto}
           />
@@ -178,7 +178,7 @@ const styles = StyleSheet.create({
     fontSize: 15,
   },
   boton: {
-    backgroundColor: "#0a57d9",
+    backgroundColor: "#125bd8ff",
     paddingVertical: 15,
     borderRadius: 8,
     marginTop: 20,
