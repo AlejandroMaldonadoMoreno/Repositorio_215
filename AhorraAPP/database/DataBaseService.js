@@ -8,13 +8,31 @@ class DatabaseService {
         this.useFallback = false;
         this._metaCache = {};
         this._fallbackStore = {}; // in-memory fallback for small test data when AsyncStorage/localStorage missing
+        this._initialized = false; // Track if initialize() has been called
+        this._initializing = false; // Prevent concurrent initialization
     }
 
     async initialize() {
-        if (Platform.OS === 'web') {
-            console.log("Usando LocalStorage para web");
-            this.useFallback = true;
-        } else {
+        // Prevent re-initialization or concurrent initialization
+        if (this._initialized || this._initializing) {
+            return;
+        }
+        this._initializing = true;
+        
+        try {
+            if (Platform.OS === 'web') {
+                console.log("Usando LocalStorage para web");
+                this.useFallback = true;
+                this._initialized = true;
+                return;
+            }
+            
+            // If already using fallback, don't try SQLite again
+            if (this.useFallback) {
+                console.log('[DataBaseService] Already using fallback storage');
+                this._initialized = true;
+                return;
+            }
             console.log("Usando SQLite para móvil");
             try {
                     // Try to open DB; retry a few times if a transient native error occurs
@@ -36,8 +54,19 @@ class DatabaseService {
                         // persist the error for logging and move to fallback
                         console.warn('[DataBaseService] openDatabaseAsync failed after retries, will use fallback', lastErr);
                         this.useFallback = true;
+                        // stop further native initialization since DB is not available
+                        return;
                     }
-                await this.db.execAsync(`
+                    
+                    // Verify db is ready before executing commands
+                    if (!this.db || typeof this.db.execAsync !== 'function') {
+                        console.warn('[DataBaseService] DB object is not properly initialized, switching to fallback');
+                        this.useFallback = true;
+                        this.db = null;
+                        return;
+                    }
+                    
+                    await this.db.execAsync(`
                 CREATE TABLE IF NOT EXISTS usuarios (
                         id INTEGER PRIMARY KEY AUTOINCREMENT,
                         nombre TEXT NOT NULL,
@@ -114,61 +143,103 @@ class DatabaseService {
                     await this.db.execAsync(`
                         CREATE INDEX IF NOT EXISTS idx_mails_user_date ON mails (user_id, fecha DESC);
                     `);
+                    // password resets table: store one-time tokens for password recovery
+                    await this.db.execAsync(`
+                        CREATE TABLE IF NOT EXISTS password_resets (
+                            id INTEGER PRIMARY KEY AUTOINCREMENT,
+                            user_id INTEGER NOT NULL,
+                            token TEXT UNIQUE,
+                            expiry DATETIME,
+                            used INTEGER DEFAULT 0,
+                            created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+                        );
+                    `);
+                    await this.db.execAsync(`
+                        CREATE INDEX IF NOT EXISTS idx_pwdreset_token ON password_resets (token);
+                    `);
                 } catch (e) {
                     // ignore additional table creation errors
                 }
+                    // Attempt safe migrations: add optional columns to `usuarios` if they don't exist.
+                    try {
+                        // Safer migration: inspect table columns first and add only missing columns
+                        try {
+                            const cols = await this._safeGetAll(`PRAGMA table_info(usuarios);`);
+                            const names = Array.isArray(cols) ? cols.map(c => (c.name || c.Name || '').toString().toLowerCase()) : [];
+                            if (!names.includes('passwordresettoken')) {
+                                await this.db.execAsync(`ALTER TABLE usuarios ADD COLUMN passwordResetToken TEXT;`);
+                            }
+                            if (!names.includes('passwordresetexpiry')) {
+                                await this.db.execAsync(`ALTER TABLE usuarios ADD COLUMN passwordResetExpiry TEXT;`);
+                            }
+                        } catch (inner) {
+                            // If PRAGMA or checks fail, fallback to attempting the ALTER and ignore duplicate-column errors gracefully
+                            try {
+                                await this.db.execAsync(`ALTER TABLE usuarios ADD COLUMN passwordResetToken TEXT;`);
+                            } catch (e1) { /* ignore */ }
+                            try {
+                                await this.db.execAsync(`ALTER TABLE usuarios ADD COLUMN passwordResetExpiry TEXT;`);
+                            } catch (e2) { /* ignore */ }
+                        }
+                    } catch (migErr) {
+                        // ignore migration errors (e.g., column already exists or other issues)
+                        // log at debug level for diagnostics
+                        console.log('[DataBaseService] migration - add password reset columns (ignored if exists):', migErr && migErr.message ? migErr.message : migErr);
+                    }
             } catch (e) {
                 console.warn('[DataBaseService] SQLite initialize failed, switching to fallback storage', e);
                 this.useFallback = true;
                 this.db = null;
             }
+        } finally {
+            this._initialized = true;
+            this._initializing = false;
         }
     }
 
     // Internal helper: attempt a native runAsync with a single retry and reopen DB if needed.
     async _safeRun(sql, params = []) {
-        // If DB is not available, switch to fallback and return a safe result for inserts
-        if (!this.db) {
-            this.useFallback = true;
+        // If already using fallback or DB not available, return immediately
+        if (this.useFallback || !this.db || typeof this.db.runAsync !== 'function') {
+            if (!this.useFallback) {
+                this.useFallback = true;
+                this.db = null;
+                console.warn('[DataBaseService] Switching to fallback (DB not available in _safeRun)');
+            }
             return { insertId: Date.now(), lastInsertRowId: Date.now() };
         }
 
         try {
             return await this.db.runAsync(sql, params);
         } catch (e) {
-            console.warn('[DataBaseService] _safeRun native error, attempting reopen/retry', e);
-            try {
-                // attempt to re-open DB once
-                this.db = await SQLite.openDatabaseAsync('AhorraApp.db');
-                return await this.db.runAsync(sql, params);
-            } catch (e2) {
-                console.warn('[DataBaseService] _safeRun retry failed, switching to fallback', e2);
-                this.useFallback = true;
-                // Return synthetic insert-like result so callers can continue using fallback storage
-                return { insertId: Date.now(), lastInsertRowId: Date.now() };
-            }
+            console.warn('[DataBaseService] _safeRun native error, switching permanently to fallback', e);
+            // Don't retry - immediately switch to fallback to avoid state thrashing
+            this.useFallback = true;
+            this.db = null;
+            return { insertId: Date.now(), lastInsertRowId: Date.now() };
         }
     }
 
     // Internal helper: attempt a native getAllAsync with a single retry and reopen DB if needed.
     async _safeGetAll(sql, params = []) {
-        if (!this.db) {
-            this.useFallback = true;
+        // If already using fallback or DB not available, return immediately
+        if (this.useFallback || !this.db || typeof this.db.getAllAsync !== 'function') {
+            if (!this.useFallback) {
+                this.useFallback = true;
+                this.db = null;
+                console.warn('[DataBaseService] Switching to fallback (DB not available in _safeGetAll)');
+            }
             return [];
         }
 
         try {
             return await this.db.getAllAsync(sql, params);
         } catch (e) {
-            console.warn('[DataBaseService] _safeGetAll native error, attempting reopen/retry', e);
-            try {
-                this.db = await SQLite.openDatabaseAsync('AhorraApp.db');
-                return await this.db.getAllAsync(sql, params);
-            } catch (e2) {
-                console.warn('[DataBaseService] _safeGetAll retry failed, switching to fallback', e2);
-                this.useFallback = true;
-                return [];
-            }
+            console.warn('[DataBaseService] _safeGetAll native error, switching permanently to fallback', e);
+            // Don't retry - immediately switch to fallback to avoid state thrashing
+            this.useFallback = true;
+            this.db = null;
+            return [];
         }
     }
     async getAll() {
@@ -235,6 +306,95 @@ class DatabaseService {
         } catch (e) {
             console.warn('_writeFallbackJSON error', e);
             return false;
+        }
+    }
+
+    // Password reset helpers (support both native DB and fallback storage)
+    async addPasswordReset(userId, token, expiry) {
+        const key = `pwdresets:user:${userId}`;
+        if (Platform.OS === 'web' || this.useFallback || !this.db) {
+            // store as array under a per-user key
+            const items = await this._readFallbackJSON(key);
+            const nuevo = { id: `f-${Date.now()}`, user_id: userId, token, expiry, used: 0, created_at: new Date().toISOString() };
+            items.unshift(nuevo);
+            await this._writeFallbackJSON(key, items);
+            // also for lookup by token keep meta mapping
+            try {
+                await this.setMeta(`pwdResetToken:${token}`, JSON.stringify({ userId, expiry, id: nuevo.id, used: 0 }));
+            } catch (e) {}
+            return nuevo;
+        }
+        try {
+            const res = await this._safeRun('INSERT INTO password_resets (user_id, token, expiry, used) VALUES (?, ?, ?, 0);', [userId, token, expiry]);
+            const id = (res && (res.lastInsertRowId || res.insertId)) || Date.now();
+            const rows = await this._safeGetAll('SELECT * FROM password_resets WHERE id = ? LIMIT 1;', [id]);
+            return (Array.isArray(rows) && rows[0]) ? rows[0] : { id, user_id: userId, token, expiry, used: 0 };
+        } catch (e) {
+            console.warn('[DataBaseService] addPasswordReset native error, switching to fallback', e);
+            this.useFallback = true;
+            return await this.addPasswordReset(userId, token, expiry);
+        }
+    }
+
+    async getPasswordResetByToken(token) {
+        if (!token) return null;
+        if (Platform.OS === 'web' || this.useFallback || !this.db) {
+            try {
+                const raw = await this.getMeta(`pwdResetToken:${token}`);
+                if (raw) {
+                    const parsed = typeof raw === 'string' ? JSON.parse(raw) : raw;
+                    return { id: parsed.id, user_id: parsed.userId, token, expiry: parsed.expiry, used: parsed.used || 0 };
+                }
+                // fallback: scan per-user lists (expensive but valid for small datasets)
+                const users = await this.getAll().catch(() => []);
+                for (const u of users) {
+                    const key = `pwdresets:user:${u.id}`;
+                    const items = await this._readFallbackJSON(key);
+                    const found = (items || []).find(x => x.token === token);
+                    if (found) return found;
+                }
+            } catch (e) { /* ignore */ }
+            return null;
+        }
+        try {
+            const rows = await this._safeGetAll('SELECT * FROM password_resets WHERE token = ? LIMIT 1;', [token]);
+            return (Array.isArray(rows) && rows.length) ? rows[0] : null;
+        } catch (e) {
+            console.warn('[DataBaseService] getPasswordResetByToken native error, switching to fallback', e);
+            this.useFallback = true;
+            return await this.getPasswordResetByToken(token);
+        }
+    }
+
+    async markPasswordResetUsed(id) {
+        if (!id) return false;
+        if (Platform.OS === 'web' || this.useFallback || !this.db) {
+            try {
+                // update meta if present
+                // if id is fallback id, try to find it and mark used
+                const users = await this.getAll().catch(() => []);
+                for (const u of users) {
+                    const key = `pwdresets:user:${u.id}`;
+                    const items = await this._readFallbackJSON(key);
+                    const idx = (items || []).findIndex(x => x.id === id || x.id === Number(id));
+                    if (idx !== -1) {
+                        items[idx].used = 1;
+                        await this._writeFallbackJSON(key, items);
+                        // clear token meta mapping if any
+                        try { if (items[idx] && items[idx].token) await this.setMeta(`pwdResetToken:${items[idx].token}`, null); } catch (e) {}
+                        return true;
+                    }
+                }
+            } catch (e) { /* ignore */ }
+            return false;
+        }
+        try {
+            await this._safeRun('UPDATE password_resets SET used = 1 WHERE id = ?;', [id]);
+            return true;
+        } catch (e) {
+            console.warn('[DataBaseService] markPasswordResetUsed native error, switching to fallback', e);
+            this.useFallback = true;
+            return await this.markPasswordResetUsed(id);
         }
     }
 
@@ -474,6 +634,31 @@ class DatabaseService {
             console.warn('getMails native error, switching to fallback', e);
             this.useFallback = true;
             return await this.getMails(userId, opts);
+        }
+    }
+
+    async deleteMail(userId, id) {
+        if (!id) throw new Error('id requerido');
+        const key = `mail:user:${userId}`;
+        if (Platform.OS === 'web' || this.useFallback) {
+            try {
+                const items = await this._readFallbackJSON(key);
+                const idx = items.findIndex(x => String(x.id) === String(id));
+                if (idx !== -1) {
+                    items.splice(idx, 1);
+                    await this._writeFallbackJSON(key, items);
+                    return true;
+                }
+            } catch (e) { console.warn('deleteMail fallback error', e); }
+            return false;
+        }
+        try {
+            await this._safeRun('DELETE FROM mails WHERE id = ? AND user_id = ?;', [id, userId]);
+            return true;
+        } catch (e) {
+            console.warn('deleteMail native error, switching to fallback', e);
+            this.useFallback = true;
+            return await this.deleteMail(userId, id);
         }
     }
 

@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect} from "react";
 import {
   View,
   Text,
@@ -9,26 +9,27 @@ import {
   Alert,
   Platform,
 } from "react-native";
-import DateTimePicker from "@react-native-community/datetimepicker";
 
-export default function ActualizarTransaccion() {
+export default function ActualizarTransaccion({ route, navigation }) {
   const [nombre, setNombre] = useState("");
   const [cuenta, setCuenta] = useState("");
   const [monto, setMonto] = useState("");
   const [concepto, setConcepto] = useState("");
   const [fecha, setFecha] = useState(new Date());
-  const [showPicker, setShowPicker] = useState(false);
 
-  const abrirCalendario = () => {
-    setShowPicker(true);
-  };
-
-  const onChangeFecha = (event, selectedDate) => {
-    setShowPicker(false);
-    if (selectedDate) {
-      setFecha(selectedDate);
+  // Cargar datos del movimiento cuando se pasa por la navegación
+  useEffect(() => {
+    if (route?.params?.movimiento) {
+      const mov = route.params.movimiento;
+      setNombre(mov.nombre || "");
+      setCuenta(mov.cuenta || "");
+      setMonto(mov.monto ? String(mov.monto) : "");
+      setConcepto(mov.concepto || mov.concept || "");
+      if (mov.fecha) {
+        setFecha(new Date(mov.fecha));
+      }
     }
-  };
+  }, [route?.params?.movimiento]);
 
   const formatearFecha = (date) => {
     return date.toLocaleDateString("es-MX", {
@@ -39,55 +40,44 @@ export default function ActualizarTransaccion() {
   };
 
   const actualizar = () => {
-    if (!nombre || !cuenta || !monto || !concepto) {
-      Alert.alert("Campos incompletos", "Por favor completa todos los datos.");
+    if (!concepto) {
+      Alert.alert("Campo incompleto", "Por favor completa el concepto.");
       return;
     }
 
     Alert.alert(
       "Transacción actualizada",
-      `Nombre: ${nombre}\nCuenta: ${cuenta}\nMonto: $${monto}\nFecha: ${formatearFecha(
-        fecha
-      )}`
+      `Concepto: ${concepto}\nMonto: $${monto}\nFecha: ${formatearFecha(fecha)}`
     );
   };
 
   return (
     <ScrollView contentContainerStyle={styles.container}>
-      <View style={styles.franjaAzul} />
+      
+      <View style={styles.franjaAzul} >
+        
+        <TouchableOpacity onPress={() => navigation.goBack()}>
+            <Text style={styles.Atras}>{"< Atrás"}</Text>
+        </TouchableOpacity>
+      
+        </View>
 
       <View style={styles.contenido}>
         <Text style={styles.titulo}>Actualizar Transacción</Text>
 
-        <View style={styles.formulario}>
-          <Text style={styles.label}>Nombre/s:</Text>
-          <TextInput
-            style={styles.input}
-            placeholder="Ej. Juan Pérez"
-            placeholderTextColor="#aaa"
-            value={nombre}
-            onChangeText={setNombre}
-          />
+        
 
-          <Text style={styles.label}>Número tarjeta o cuenta:</Text>
-          <TextInput
-            style={styles.input}
-            keyboardType="numeric"
-            placeholder="Ej. 1234 5678 9012 3456"
-            placeholderTextColor="#aaa"
-            value={cuenta}
-            onChangeText={setCuenta}
-          />
+          
+          <View style={styles.formulario}>
+
+          
 
           <Text style={styles.label}>Monto:</Text>
-          <TextInput
-            style={styles.input}
-            keyboardType="numeric"
-            placeholder="Ej. 1500.00"
-            placeholderTextColor="#aaa"
-            value={monto}
-            onChangeText={setMonto}
-          />
+          <View style={[styles.input, {backgroundColor: '#f0f0f0'}]}>
+            <Text style={{ color: "#666", fontSize: 15 }}>
+              {monto ? `$ ${monto}` : "$ 0.00"}
+            </Text>
+          </View>
 
           <Text style={styles.label}>Concepto:</Text>
           <TextInput
@@ -99,21 +89,11 @@ export default function ActualizarTransaccion() {
           />
 
           <Text style={styles.label}>Fecha:</Text>
-          <TouchableOpacity style={styles.input} onPress={abrirCalendario}>
-            <Text style={{ color: "#000", fontSize: 15 }}>
+          <View style={[styles.input, {backgroundColor: '#f0f0f0'}]}>
+            <Text style={{ color: "#666", fontSize: 15 }}>
               {formatearFecha(fecha)}
             </Text>
-          </TouchableOpacity>
-
-          {showPicker && (
-            <DateTimePicker
-              value={fecha}
-              mode="date"
-              display={Platform.OS === "ios" ? "spinner" : "calendar"}
-              onChange={onChangeFecha}
-              maximumDate={new Date()}
-            />
-          )}
+          </View>
 
           <TouchableOpacity style={styles.boton} onPress={actualizar}>
             <Text style={styles.textoBoton}>Actualizar</Text>
@@ -132,14 +112,19 @@ const styles = StyleSheet.create({
     justifyContent: "flex-start",
   },
   franjaAzul: {
-    backgroundColor: "#002359",
-    height: 230,
-    width: "100%",
     position: "absolute",
     top: 0,
     left: 0,
-    borderBottomLeftRadius: 50,
-    borderBottomRightRadius: 50,
+    width: "100%",
+    height: 250,
+    backgroundColor: "#002359",
+    borderBottomLeftRadius: 40,
+    borderBottomRightRadius: 40,
+
+    paddingTop: 30,
+    paddingLeft: 20,
+    
+      
   },
   contenido: {
     width: "90%",
@@ -189,4 +174,10 @@ const styles = StyleSheet.create({
     fontWeight: "600",
     textAlign: "center",
   },
+ 
+  Atras: {
+        color: "#0a57d9",
+        fontSize: 16,
+    },
+
 });
