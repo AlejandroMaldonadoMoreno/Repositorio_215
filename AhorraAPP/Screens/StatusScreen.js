@@ -194,16 +194,6 @@ export default function StatusScreen({ navigation }) {
             Alert.alert('Gastado inválido', 'Ingresa un valor numérico válido para "Gastado hasta ahora" (>= 0)');
             return;
         }
-        // Gastado no puede ser igual o mayor que el límite
-        if (parsedSpent >= parsedLimit) {
-            Alert.alert('Valor inválido', 'El valor "Gastado hasta ahora" no puede ser igual o mayor que el límite');
-            return;
-        }
-        // Si hay usuario con saldo, no permitir límite mayor al saldo disponible
-        if (user && typeof saldo === 'number' && parsedLimit > saldo) {
-            Alert.alert('Límite mayor que saldo', 'El límite del presupuesto no puede ser mayor que tu saldo disponible');
-            return;
-        }
 
         // Confirmación para actualizar presupuesto existente
         if (editingMonthlyId) {
@@ -212,15 +202,15 @@ export default function StatusScreen({ navigation }) {
                 `¿Deseas actualizar el presupuesto "${newMonthlyCategory.trim()}"?`,
                 [
                     { text: 'Cancelar', style: 'cancel' },
-                    { text: 'Actualizar', onPress: () => performSaveBudget() }
+                    { text: 'Actualizar', onPress: () => performSaveBudget(parsedLimit, parsedSpent) }
                 ]
             );
         } else {
-            performSaveBudget();
+            performSaveBudget(parsedLimit, parsedSpent);
         }
     };
 
-    const performSaveBudget = async () => {
+    const performSaveBudget = async (parsedLimit, parsedSpent) => {
         const currentMonth = new Date().getMonth() + 1;
         const currentYear = new Date().getFullYear();
         const payload = {
