@@ -1075,7 +1075,7 @@ const metrics = {
     circle: 40,
     dot: 12,
     barW: 18,
-    chartH: 100,
+    chartH: 175,
     doubleBarW: 38
 };
 
@@ -1162,7 +1162,7 @@ const styles = StyleSheet.create({
     sectionTitle: { fontSize: 16, fontWeight: '700' },
     link: { color: palette.primary, fontWeight: '600' },
 
-    legendAndChart: { flexDirection: 'row', gap: 12 },
+    legendAndChart: { flexDirection: 'row', gap: 16 },
     legend: { flex: 1, justifyContent: 'center' },
     legendBlock: { flex: 1, paddingLeft: 16, justifyContent: 'center' },
     legendItem: {
