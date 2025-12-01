@@ -662,6 +662,49 @@ class DatabaseService {
         }
     }
 
+    async updateMail(userId, id, updates) {
+        if (!id) throw new Error('id requerido');
+        const key = `mail:user:${userId}`;
+        if (Platform.OS === 'web' || this.useFallback) {
+            try {
+                const items = await this._readFallbackJSON(key);
+                const idx = items.findIndex(x => String(x.id) === String(id));
+                if (idx !== -1) {
+                    items[idx] = { ...items[idx], ...updates };
+                    await this._writeFallbackJSON(key, items);
+                    return items[idx];
+                }
+            } catch (e) { console.warn('updateMail fallback error', e); }
+            return null;
+        }
+        try {
+            const fields = [];
+            const params = [];
+            if (updates.subject !== undefined) {
+                fields.push('subject = ?');
+                params.push(updates.subject);
+            }
+            if (updates.body !== undefined) {
+                fields.push('body = ?');
+                params.push(updates.body);
+            }
+            if (updates.read !== undefined) {
+                fields.push('is_read = ?');
+                params.push(updates.read ? 1 : 0);
+            }
+            if (fields.length === 0) return null;
+            
+            params.push(id, userId);
+            const sql = `UPDATE mails SET ${fields.join(', ')} WHERE id = ? AND user_id = ?;`;
+            await this._safeRun(sql, params);
+            return { id, ...updates };
+        } catch (e) {
+            console.warn('updateMail native error, switching to fallback', e);
+            this.useFallback = true;
+            return await this.updateMail(userId, id, updates);
+        }
+    }
+
     async updateBudget(id, updates) {
         if (!id) throw new Error('id requerido');
         const keys = Object.keys(updates || {});

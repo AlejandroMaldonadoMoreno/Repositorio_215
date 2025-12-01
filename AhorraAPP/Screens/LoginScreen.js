@@ -206,7 +206,7 @@ export default function LoginScreen({ navigation }) {
                 await usuarioController.initialize();
                 const res = await usuarioController.resetPasswordWithToken(rpToken.trim(), rpNewPassword);
                 if (res && res.status === 'ok') {
-                    Alert.alert('Hecho', 'Contraseña restablecida correctamente');
+                    Alert.alert('¡Contraseña cambiada!', 'Tu contraseña ha sido cambiada exitosamente. Ahora puedes iniciar sesión con tu nueva contraseña.');
                     setModalVisible(null);
                     setRpToken('');
                     setRpNewPassword('');

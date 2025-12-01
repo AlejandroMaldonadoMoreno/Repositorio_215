@@ -246,14 +246,11 @@ export class UsuarioController {
                 }
             }
 
-            // Construir enlace de ejemplo (ajustar según deep link o endpoint real)
-            const resetLink = `https://example.com/reset-password?token=${encodeURIComponent(token)}`;
-
             // Enviar mail al buzón del usuario (si la DB tiene buzón)
             try {
                 if (DatabaseService && typeof DatabaseService.addMail === 'function') {
                     const subject = 'Instrucciones para recuperar tu contraseña';
-                    const body = `Hola ${found.nombre || ''},\n\nHemos recibido una solicitud para restablecer la contraseña de tu cuenta (${found.correo}).\n\nPulsa el siguiente enlace para restablecer tu contraseña (válido por 1 hora):\n\n${resetLink}\n\nSi no solicitaste este cambio, ignora este mensaje.\n\nSaludos,\nEquipo AhorraAPP`;
+                    const body = `Hola ${found.nombre || ''},\n\nHemos recibido una solicitud para restablecer la contraseña de tu cuenta (${found.correo}).\n\nSi no solicitaste este cambio, ignora este mensaje.\n\nSaludos,\nEquipo AhorraAPP`;
                     await DatabaseService.addMail(found.id, { subject, body, is_read: 0 });
                     console.log('[UsuarioController] enviarRecuperacion: mail de recuperación añadido para user=', found.id);
                 } else {
@@ -316,6 +313,19 @@ export class UsuarioController {
             }
             // mark token as used
             try { await DatabaseService.markPasswordResetUsed(pr.id); } catch (e) { /* ignore */ }
+            
+            // Enviar notificación al buzón del usuario
+            try {
+                if (DatabaseService && typeof DatabaseService.addMail === 'function') {
+                    const subject = 'Contraseña cambiada';
+                    const body = `Tu contraseña ha sido cambiada exitosamente el ${new Date().toLocaleString('es-CO', { dateStyle: 'long', timeStyle: 'short' })}. Si no realizaste este cambio, contacta con soporte inmediatamente.`;
+                    await DatabaseService.addMail(uid, { subject, body, is_read: 0 });
+                    console.log('[UsuarioController] resetPasswordWithToken: notificación de cambio de contraseña enviada para user=', uid);
+                }
+            } catch (e) {
+                console.warn('[UsuarioController] resetPasswordWithToken: no se pudo enviar notificación', e);
+            }
+            
             return { status: 'ok' };
         } catch (err) {
             if (err && err.userMessage) throw err;

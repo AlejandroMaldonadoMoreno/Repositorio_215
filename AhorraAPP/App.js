@@ -11,7 +11,7 @@ import GraficaDetailScreen from './Screens/GraficaDetailScreen';
 import ProfileScreen from './Screens/ProfileScreen';
 import StatusScreen from './Screens/StatusScreen';
 import Actualizar from './Screens/Actualizar';
-import PantallaTransacciones from './Screens/Pantalla_Transacciones.instructions';
+import MovimientoScreen from './Screens/MovimientoScreen';
 
 const Stack = createNativeStackNavigator();
 const Tab = createBottomTabNavigator();
@@ -95,7 +95,7 @@ export default function App() {
                 <Stack.Screen name="Profile" component={ProfileScreen} />
                 <Stack.Screen name="Status" component={StatusScreen} />
                 <Stack.Screen name="Actualizar" component={Actualizar} />
-                <Stack.Screen name="Transacciones" component={PantallaTransacciones} />
+                <Stack.Screen name="Movimiento" component={MovimientoScreen} />
             </Stack.Navigator>
         </NavigationContainer>
     );

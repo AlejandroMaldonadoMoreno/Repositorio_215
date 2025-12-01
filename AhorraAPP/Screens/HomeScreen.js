@@ -7,7 +7,7 @@ import GraficaDetailScreen from './GraficaDetailScreen';
 import GraficaScreen from './GraficaScreen';
 import HomeScreen from './HomeScreen';
 import LoginScreen from './LoginScreen';
-import Pantalla_Transacciones from './Pantalla_Transacciones.instructions';
+import Pantalla_Transacciones from './MovimientoScreen';
 import StatusScreen from './StatusScreen';
 import ProfileScreen from "./ProfileScreen";
 

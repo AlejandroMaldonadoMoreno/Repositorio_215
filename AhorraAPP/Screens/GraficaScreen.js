@@ -39,7 +39,14 @@ export default function GraficaScreen({ navigation }) {
     useFocusEffect(
         React.useCallback(() => {
             const onBackPress = () => {
-                if (isLoggedIn) {
+                // Si estamos en detalle, volver a principal
+                if (ruta === 'detalle') {
+                    setRuta('principal');
+                    return true;
+                }
+                
+                // Si estamos en principal y hay sesión, preguntar si desea cerrar sesión
+                if (isLoggedIn && ruta === 'principal') {
                     Alert.alert(
                         'Salir',
                         '¿Deseas cerrar sesión?',
@@ -69,6 +76,7 @@ export default function GraficaScreen({ navigation }) {
                     );
                     return true;
                 }
+                
                 return false;
             };
 
@@ -86,7 +94,7 @@ export default function GraficaScreen({ navigation }) {
                     console.warn('[GraficaScreen] error removing BackHandler listener', e);
                 }
             };
-        }, [isLoggedIn])
+        }, [isLoggedIn, ruta])
     );
 
     return ruta === 'principal' ? (
@@ -100,11 +108,15 @@ export default function GraficaScreen({ navigation }) {
 function Principal({ onVerDetalle, navigation }) {
     const [notifVisible, setNotifVisible] = useState(false);
     const [notifications, setNotifications] = useState([]);
+    const [unreadCount, setUnreadCount] = useState(0);
+    const [toastVisible, setToastVisible] = useState(false);
+    const [toastMessage, setToastMessage] = useState('');
     const [user, setUser] = useState(null);
     const [transactions, setTransactions] = useState([]);
     const [budgets, setBudgets] = useState([]);
     const [usersList, setUsersList] = useState([]);
     const [loadingData, setLoadingData] = useState(true);
+    const seenNotificationIdsRef = React.useRef(new Set());
     const [saldoDisponible, setSaldoDisponible] = useState(null);
     const [categoryTotals, setCategoryTotals] = useState([]);
     const [chartModalVisible, setChartModalVisible] = useState(false);
@@ -191,7 +203,31 @@ function Principal({ onVerDetalle, navigation }) {
                         typeof DatabaseService.getMails === 'function'
                     ) {
                         const mails = await DatabaseService.getMails(u.id, { limit: 50 });
-                        setNotifications(Array.isArray(mails) ? mails : []);
+                        const mailList = Array.isArray(mails) ? mails : [];
+                        
+                        // Detectar notificaciones NUEVAS Y NO LEÍDAS comparando con las IDs ya vistas
+                        const newNotifications = mailList.filter(
+                            n => n.id && 
+                                 !seenNotificationIdsRef.current.has(String(n.id)) &&
+                                 !n.read && !n.is_read  // Solo contar las no leídas
+                        );
+                        
+                        if (newNotifications.length > 0) {
+                            // Hay notificaciones nuevas no leídas
+                            setUnreadCount(prev => prev + newNotifications.length);
+                            // Mostrar toast solo para la más reciente
+                            const newest = newNotifications[0];
+                            if (newest && (newest.subject || newest.title)) {
+                                showToast(newest.subject || newest.title);
+                            }
+                        }
+                        
+                        // Actualizar el set de IDs vistas (marcar TODAS como vistas, leídas o no)
+                        mailList.forEach(n => {
+                            if (n.id) seenNotificationIdsRef.current.add(String(n.id));
+                        });
+                        
+                        setNotifications(mailList);
                     }
                 } catch (e) {
                     console.warn('[GraficaScreen] error getting mails', e);
@@ -263,12 +299,52 @@ function Principal({ onVerDetalle, navigation }) {
         } catch (e) {
             console.warn('[GraficaScreen] deleteMail error', e);
         }
-        setNotifications(prev =>
-            Array.isArray(prev)
+        
+        // Si la notificación eliminada estaba en el contador de no leídas, decrementar
+        const notifToDelete = notifications.find(n => String(n.id) === String(id));
+        const wasUnread = notifToDelete && !notifToDelete.read;
+        
+        setNotifications(prev => {
+            const updated = Array.isArray(prev)
                 ? prev.filter(n => String(n.id) !== String(id))
-                : []
-        );
+                : [];
+            return updated;
+        });
+        
+        if (wasUnread) {
+            setUnreadCount(prev => Math.max(0, prev - 1));
+        }
+        
+        // Remover del set de IDs vistas
+        if (id) seenNotificationIdsRef.current.delete(String(id));
     };
+
+    // Show toast notification
+    const showToast = (message) => {
+        setToastMessage(message);
+        setToastVisible(true);
+        setTimeout(() => {
+            setToastVisible(false);
+        }, 3000);
+    };
+
+    // Handle opening notification modal - mark all as read
+    const handleOpenNotifications = () => {
+        setNotifVisible(true);
+        setUnreadCount(0);
+        // Optionally mark all notifications as read in database
+        if (user && notifications.length > 0) {
+            notifications.forEach(n => {
+                if (!n.read && n.id) {
+                    DatabaseService.updateMail(user.id, n.id, { read: true }).catch(() => null);
+                }
+            });
+            // Update local state
+            setNotifications(prev => prev.map(n => ({ ...n, read: true })));
+        }
+    };
+
+
 
     const renderChartAndLegend = (inModal = false) => {
         return (
@@ -411,15 +487,56 @@ function Principal({ onVerDetalle, navigation }) {
         })
         .slice(0, 3);
 
+    const handleAtrasPress = () => {
+        Alert.alert(
+            'Salir',
+            '¿Deseas cerrar sesión?',
+            [
+                { text: 'Cancelar', style: 'cancel' },
+                {
+                    text: 'Cerrar sesión',
+                    style: 'destructive',
+                    onPress: async () => {
+                        try {
+                            await usuarioController.logout();
+                        } catch (e) {
+                            console.warn('[GraficaScreen] logout error', e);
+                        }
+                        try {
+                            navigation.reset({ index: 0, routes: [{ name: 'Login' }] });
+                        } catch (e) {
+                            try {
+                                navigation.navigate('Login');
+                            } catch (e2) {
+                                navigation.popToTop();
+                            }
+                        }
+                    }
+                }
+            ]
+        );
+    };
+
     return (
         <View style={[styles.container, { backgroundColor: palette.bg }]}>
             <View style={styles.fondoAzul} />
-
+    
+    
+    
             <ScrollView
                 style={{ flex: 1 }}
                 contentContainerStyle={{ padding: 16 }}
             >
+                
+                <TouchableOpacity 
+
+                    onPress={handleAtrasPress}
+                 >
+                    <Text style={styles.Atras}>{"< Atrás"}</Text>
+                </TouchableOpacity>
+
                 <View style={[styles.cardBalance]}>
+                    
                     <Text style={styles.small}>Saldo Disponible</Text>
                     <Text style={styles.balance}>
                         $ {typeof saldoDisponible === 'number'
@@ -438,13 +555,20 @@ function Principal({ onVerDetalle, navigation }) {
 
                         <TouchableOpacity
                             style={styles.circleIcon}
-                            onPress={() => setNotifVisible(true)}
+                            onPress={handleOpenNotifications}
                         >
                             <Ionicons
                                 name="mail"
                                 size={metrics.circle * 0.6}
                                 color={palette.primary}
                             />
+                            {unreadCount > 0 && (
+                                <View style={styles.badge}>
+                                    <Text style={styles.badgeText}>
+                                        {unreadCount > 9 ? '9+' : unreadCount}
+                                    </Text>
+                                </View>
+                            )}
                         </TouchableOpacity>
                     </View>
                 </View>
@@ -675,6 +799,16 @@ function Principal({ onVerDetalle, navigation }) {
                     <Ionicons name="home" size={28} color="#ffffff" />
                 </TouchableOpacity>
             </View>
+
+            {/* Toast Notification */}
+            {toastVisible && (
+                <View style={styles.toastContainer}>
+                    <View style={styles.toast}>
+                        <Ionicons name="notifications" size={20} color="#ffffff" style={{ marginRight: 8 }} />
+                        <Text style={styles.toastText}>{toastMessage}</Text>
+                    </View>
+                </View>
+            )}
         </View>
     );
 }
@@ -776,6 +910,12 @@ function Detalle({ onVolver, navigation }) {
                 style={{ flex: 1 }}
                 contentContainerStyle={{ padding: 16 }}
             >
+                <TouchableOpacity 
+
+                    onPress={onVolver}
+                 >
+                    <Text style={styles.Atras}>{"< Atrás"}</Text>
+                </TouchableOpacity>
                 <View style={[styles.cardBalance]}>
                     <Text style={styles.small}>Saldo Disponible</Text>
                     <Text style={styles.balance}>
@@ -949,17 +1089,27 @@ const styles = StyleSheet.create({
         elevation: 3,
         shadowColor: '#000',
         shadowOpacity: 0.08,
-        marginTop: Platform.OS === 'android' ? 60 : 80
+        marginTop: Platform.OS === 'android' ? 20 : 80
     },
     fondoAzul: {
-        position: 'absolute',
+        position: "absolute",
         top: 0,
         left: 0,
-        width: '100%',
+        width: "100%",
         height: 250,
-        backgroundColor: '#002359',
+        backgroundColor: "#002359",
         borderBottomLeftRadius: 40,
-        borderBottomRightRadius: 40
+        borderBottomRightRadius: 40,
+
+        paddingTop: 30,
+        paddingLeft: 20,
+        
+    },
+    Atras: {
+        color: "#0a57d9",
+        fontSize: 16,
+        marginTop: 15,
+        
     },
     fondoInferior: {
         position: 'absolute',
@@ -1145,14 +1295,14 @@ const styles = StyleSheet.create({
         position: 'absolute',
         top: 5,
         right: 5,
-        width: 16,
-        height: 16,
-        borderRadius: 8,
+        width: 18,
+        height: 18,
+        borderRadius: 9,
         backgroundColor: 'rgba(0,0,0,0.06)',
         alignItems: 'center',
         justifyContent: 'center'
     },
-    notifCloseText: { color: '#333', fontSize: 8 },
+    notifCloseText: { color: '#333', fontSize: 10 },
     notifTitle: { fontWeight: '700', marginBottom: 4 },
     notifBody: { color: '#444', marginBottom: 6 },
     notifTime: { color: '#888', fontSize: 12 },
@@ -1179,6 +1329,51 @@ const styles = StyleSheet.create({
         justifyContent: 'center',
         borderWidth: 2,
         borderColor: '#ffffff'
+    },
+    // Badge for unread notifications
+    badge: {
+        position: 'absolute',
+        top: -4,
+        right: -4,
+        backgroundColor: '#FF3B30',
+        borderRadius: 10,
+        minWidth: 20,
+        height: 20,
+        alignItems: 'center',
+        justifyContent: 'center',
+        paddingHorizontal: 4
+    },
+    badgeText: {
+        color: '#ffffff',
+        fontSize: 12,
+        fontWeight: 'bold'
+    },
+    // Toast notification styles
+    toastContainer: {
+        position: 'absolute',
+        top: 50,
+        left: 20,
+        right: 20,
+        alignItems: 'center',
+        zIndex: 9999
+    },
+    toast: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: 'rgba(0, 0, 0, 0.85)',
+        paddingVertical: 12,
+        paddingHorizontal: 20,
+        borderRadius: 8,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.3,
+        shadowRadius: 4,
+        elevation: 5
+    },
+    toastText: {
+        color: '#ffffff',
+        fontSize: 14,
+        fontWeight: '500'
     }
 });
 

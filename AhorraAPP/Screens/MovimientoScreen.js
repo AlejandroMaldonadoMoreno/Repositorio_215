@@ -6,7 +6,7 @@ import { UsuarioController } from '../controllers/UsuarioController';
 
 const usuarioController = new UsuarioController();
 
-export default function Pantalla_Transacciones({ navigation }) {
+export default function MovimientoScreen({ navigation }) {
   const [dateTransaccion, setDateTransaccion] = useState(new Date());
   const [showDateTransaccion, setShowDateTransaccion] = useState(false);
 
@@ -64,10 +64,15 @@ export default function Pantalla_Transacciones({ navigation }) {
   };
 
   const handleSubmit = async () => {
-    if (!user) return Alert.alert('Error', 'Debes iniciar sesión para realizar una transacción');
+    if (!user) return Alert.alert('Error', 'Debes iniciar sesión para realizar una transferencia');
     const value = parseFloat((monto || '').toString().replace(',', '.')) || 0;
     if (value <= 0) return Alert.alert('Monto inválido', 'Ingresa un monto mayor a 0');
-    if (value > saldoDisponible) return Alert.alert('Saldo insuficiente', 'El monto supera tu saldo disponible');
+    if (value > saldoDisponible) {
+      return Alert.alert(
+        'Saldo insuficiente', 
+        `No tienes suficiente saldo para realizar esta transferencia.\n\nSaldo disponible: $${saldoDisponible.toFixed(2)}\nTransferencia que intentas realizar: $${value.toFixed(2)}\nFaltante: $${(value - saldoDisponible).toFixed(2)}`
+      );
+    }
 
     // buscar cuenta destino por número de cuenta o correo
     const allUsers = await DatabaseService.getAll().catch(() => []);
@@ -96,7 +101,7 @@ export default function Pantalla_Transacciones({ navigation }) {
     // concepto por defecto si vacío
     const conceptFinal = (concepto && concepto.trim()) ? concepto.trim() : `Movimiento`;
 
-    // registrar transacción: débito para remitente, crédito para receptor
+    // registrar transferencia: débito para remitente, crédito para receptor
     try {
       const fechaISO = (dateTransaccion && dateTransaccion.toISOString) ? dateTransaccion.toISOString() : new Date().toISOString();
       // débito remitente
@@ -139,13 +144,13 @@ export default function Pantalla_Transacciones({ navigation }) {
         await DatabaseService.addMail(user.id, { subject: subjS, body: bodyS, is_read: 0 });
       } catch (e) { console.warn('mail to sender error', e); }
 
-      Alert.alert('Éxito', 'Transacción registrada correctamente');
+      Alert.alert('Éxito', 'transferencia registrada correctamente');
       // limpiar formulario y recargar contexto
       setNombre(''); setCuentaDestino(''); setMonto(''); setConcepto(''); setSelectedBudget(null);
       await loadContext();
     } catch (e) {
       console.error('[Pantalla_Transacciones] submit error', e);
-      Alert.alert('Error', 'No fue posible completar la transacción');
+      Alert.alert('Error', 'No fue posible completar la transferencia');
     }
   };
 
@@ -166,9 +171,9 @@ export default function Pantalla_Transacciones({ navigation }) {
           <Text style={styles.saldoMonto}>$ {typeof saldoDisponible === 'number' ? saldoDisponible.toFixed(2) : '0.00'}</Text>
         </View>
 
-        {/* Formulario 1 - Transacción */}
+        {/* Formulario 1 - transferencia */}
         <View style={styles.formulario}>
-          <Text style={styles.tituloSeccion}>Transacción</Text>
+          <Text style={styles.tituloSeccion}>transferencia</Text>
 
           <Text style={styles.label}>Nombre (destinatario):</Text>
           <TextInput value={nombre} onChangeText={setNombre} style={styles.input} placeholder="Ej. Juan Pérez" placeholderTextColor="#aaa" />
